@@ -1,0 +1,147 @@
+{
+  "version": "0.1",
+  "purpose": "Deterministic validation fixtures for the Trading Research Console. These are synthetic OHLC scenarios derived from the locked Strat rule definitions; they are not profitability evidence.",
+  "scenarios": [
+    {
+      "id": "bar-inside",
+      "category": "classification",
+      "prior": {"high": 10, "low": 5},
+      "current": {"high": 9, "low": 6},
+      "expected": {"strat": "1"}
+    },
+    {
+      "id": "bar-2u",
+      "category": "classification",
+      "prior": {"high": 10, "low": 5},
+      "current": {"high": 11, "low": 6},
+      "expected": {"strat": "2U"}
+    },
+    {
+      "id": "bar-2d",
+      "category": "classification",
+      "prior": {"high": 10, "low": 5},
+      "current": {"high": 9, "low": 4},
+      "expected": {"strat": "2D"}
+    },
+    {
+      "id": "bar-3",
+      "category": "classification",
+      "prior": {"high": 10, "low": 5},
+      "current": {"high": 11, "low": 4},
+      "expected": {"strat": "3"}
+    },
+    {
+      "id": "bullish-22",
+      "category": "setup",
+      "bars": [
+        {"open": 9, "high": 12, "low": 8, "close": 11},
+        {"open": 10, "high": 11, "low": 7, "close": 8},
+        {"open": 8, "high": 12, "low": 7.5, "close": 11.5}
+      ],
+      "currentPrice": 11.5,
+      "expected": {"setup": "2-2", "direction": "BULLISH", "trigger": 11, "inForce": true, "stop50": 9, "structureStop": 7}
+    },
+    {
+      "id": "bearish-22",
+      "category": "setup",
+      "bars": [
+        {"open": 9, "high": 12, "low": 8, "close": 11},
+        {"open": 10, "high": 13, "low": 9, "close": 12},
+        {"open": 12, "high": 12.5, "low": 8.5, "close": 9}
+      ],
+      "currentPrice": 8.8,
+      "expected": {"setup": "2-2", "direction": "BEARISH", "trigger": 9, "inForce": true, "structureStop": 13}
+    },
+    {
+      "id": "bullish-212",
+      "category": "setup",
+      "bars": [
+        {"open": 10, "high": 13, "low": 9, "close": 12},
+        {"open": 11, "high": 12, "low": 8, "close": 9},
+        {"open": 9, "high": 11.5, "low": 8.5, "close": 10.5},
+        {"open": 10.5, "high": 12, "low": 9, "close": 11.8}
+      ],
+      "currentPrice": 11.8,
+      "expected": {"setup": "2-1-2", "direction": "BULLISH", "trigger": 11.5, "target": 12, "inForce": true}
+    },
+    {
+      "id": "bearish-212",
+      "category": "setup",
+      "bars": [
+        {"open": 9, "high": 12, "low": 8, "close": 10},
+        {"open": 10, "high": 13, "low": 9, "close": 12},
+        {"open": 12, "high": 12.5, "low": 9.5, "close": 10.5},
+        {"open": 10.5, "high": 12, "low": 9, "close": 9.2}
+      ],
+      "currentPrice": 9.2,
+      "expected": {"setup": "2-1-2", "direction": "BEARISH", "trigger": 9.5, "target": 9, "inForce": true}
+    },
+    {
+      "id": "bullish-312",
+      "category": "setup",
+      "bars": [
+        {"open": 7, "high": 10, "low": 6, "close": 9},
+        {"open": 9, "high": 11, "low": 5, "close": 6},
+        {"open": 6, "high": 10.5, "low": 5.5, "close": 9},
+        {"open": 9, "high": 10.8, "low": 6, "close": 10.7}
+      ],
+      "currentPrice": 10.7,
+      "expected": {"setup": "3-1-2", "direction": "BULLISH"}
+    },
+    {
+      "id": "pending-inside-break",
+      "category": "setup",
+      "bars": [
+        {"open": 7, "high": 10, "low": 6, "close": 9},
+        {"open": 9, "high": 9.5, "low": 6.5, "close": 8},
+        {"open": 8, "high": 9.4, "low": 6.6, "close": 8.5}
+      ],
+      "expected": {"setup": "INSIDE BREAK PENDING", "direction": "BOTH", "triggerUp": 9.5, "triggerDown": 6.5}
+    },
+    {
+      "id": "ftfc-4of4-bull",
+      "category": "ftfc",
+      "timeframes": [
+        {"open": 1, "price": 2},
+        {"open": 2, "price": 3},
+        {"open": 3, "price": 4},
+        {"open": 4, "price": 5}
+      ],
+      "expected": {"label": "4/4 BULLISH"}
+    },
+    {
+      "id": "ftfc-3of4-bear",
+      "category": "ftfc",
+      "timeframes": [
+        {"open": 2, "price": 1},
+        {"open": 3, "price": 2},
+        {"open": 4, "price": 3},
+        {"open": 1, "price": 2}
+      ],
+      "expected": {"label": "3/4 BEARISH"}
+    },
+    {
+      "id": "time-exhaustion-boundaries",
+      "category": "time-exhaustion",
+      "checks": [
+        {"progressPct": 0, "expected": "LOW"},
+        {"progressPct": 49.99, "expected": "LOW"},
+        {"progressPct": 50, "expected": "MEDIUM"},
+        {"progressPct": 80, "expected": "MEDIUM"},
+        {"progressPct": 80.01, "expected": "HIGH"},
+        {"progressPct": 100, "expected": "HIGH"}
+      ]
+    },
+    {
+      "id": "outside-path-ambiguity",
+      "category": "audit-limit",
+      "prior": {"high": 10, "low": 5},
+      "current": {"high": 11, "low": 4},
+      "expected": {
+        "strat": "3",
+        "pathKnownFromOHLC": false,
+        "note": "Completed OHLC proves an outside bar but not whether the high or low was taken first. Lower-timeframe/intrabar data is required to classify failed-2 reversal direction with certainty."
+      }
+    }
+  ]
+}
