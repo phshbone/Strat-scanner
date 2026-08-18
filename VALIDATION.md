@@ -1,4 +1,4 @@
-# Engine Validation — v0.4
+# Engine Validation — v0.5
 
 Date: 2026-08-18
 
@@ -8,7 +8,9 @@ Synthetic deterministic layer: **PASS — 44/44 checks in the v0.2 expanded harn
 
 Real-market validation layer: **STARTED. RM-001 (SPY September 2021 Outside 50 / potential outside month) passes the stated rule geometry and sequence using consistent historical data.**
 
-SSS50 operational-state layer: **ADDED.** The focused validator now models INVALID -> STANDBY -> ACTIVE -> COMPLETE in both bullish and bearish directions.
+SSS50 operational-state layer: **ADDED.** The focused validator models INVALID -> STANDBY -> ACTIVE -> COMPLETE in both bullish and bearish directions.
+
+Magnitude target-stack layer: **ADDED — 11/11 deterministic checks pass locally.** The engine can now maintain a directional stack of already-validated pivots, consume targets as price reaches them, promote the next target, and flag exhaustion when no directional targets remain. Automatic pivot discovery is intentionally not yet locked.
 
 ## Important correction discovered by real-market validation
 The first real example exposed a semantic error in the focused Outside 50 implementation: the 50% condition is a LIVE-PRICE / intrabar condition, not a candle-close confirmation.
@@ -19,22 +21,30 @@ Correct behavior:
 - coarse completed OHLC cannot always establish first-side ordering.
 
 ## SSS50 state clarification
-Public implementation evidence further supports treating SSS50 as a progression rather than a single flag.
-
-The Sarah-created TrendSpider scanner `Strat D 50% Rule Long` identifies the bullish active geometry as:
-- current price/close above the middle of the previous daily range,
-- current low below the previous low,
-- current high still below the previous high.
-
-That maps naturally to a failed 2D that has crossed 50% but has not yet completed the outside day.
-
-The engine now records these states:
+The engine records:
 - `INVALID` — no failed-two condition yet,
 - `STANDBY` — one side taken and failed back into prior range, midpoint not yet crossed,
 - `ACTIVE` — failed two + prior midpoint crossed; opposite side is target,
 - `COMPLETE` — both sides of prior candle taken.
 
 See `tests/SSS50-STATE-MACHINE.md` and `tests/outside-50-rule-validation.js`.
+
+## Magnitude / pivot-stack clarification
+The magnitude engine is split into two responsibilities:
+
+1. **Pivot identification** — still under source-backed real-market validation.
+2. **Target-stack mechanics** — now deterministic and tested.
+
+Given an origin price, direction, and list of validated pivots:
+- bullish stack = pivots above origin, nearest first;
+- bearish stack = pivots below origin, nearest first;
+- reached targets are consumed;
+- next remaining pivot is promoted;
+- no remaining directional pivots => `exhaustionRisk = true`.
+
+Exhaustion is context only, not an automatic reversal signal.
+
+See `magnitude.js`, `tests/magnitude-validation.js`, and `MAGNITUDE-SPEC.md`.
 
 ## Synthetic coverage
 - Scenario 1 / inside bar, including equality edges
@@ -60,6 +70,9 @@ See `tests/SSS50-STATE-MACHINE.md` and `tests/outside-50-rule-validation.js`.
 - exhaustion + opposing reversal state
 - Outside 50% target-active state
 - Outside 50% target-hit state
+- bullish and bearish directional pivot-stack ordering
+- target consumption and promotion
+- exhaustion after directional stack is cleared
 
 ## Real-market case RM-001 — SPY September 2021
 Using a consistent adjusted StatMuse series:
@@ -88,16 +101,19 @@ See:
 - `tests/KNOWN-SCENARIOS.md` — fixture documentation
 - `tests/exhaustion-outside50-sequence.md` — exhaustion / reversal / Outside 50 sequence notes
 - `OUTSIDE-50-RULE.md` — operational rule specification v0.3
+- `magnitude.js` — deterministic target-stack engine
+- `tests/magnitude-validation.js` — magnitude stack tests
+- `MAGNITUDE-SPEC.md` — scope boundary and unresolved pivot-identification questions
 
 ## Scope note
 These checks validate rule implementation. They do **not** establish profitability, expectancy, or general statistical edge.
 
 ## Next validation work
 Continue with known real examples and historical OHLC to verify:
-1. actionable 2-2 / 2-1-2 / 3-1-2 trigger selection,
-2. live/in-force transitions,
-3. pivot/magnitude selection,
-4. price exhaustion after magnitude completion,
+1. automatic pivot identification,
+2. exact first-target selection by setup family,
+3. price exhaustion after magnitude completion,
+4. actionable 2-2 / 2-1-2 / 3-1-2 trigger selection on real charts,
 5. multi-timeframe domino sequences,
 6. outside-bar sequence resolution with lower-timeframe data,
 7. configurable timeframe groups on real charts.
