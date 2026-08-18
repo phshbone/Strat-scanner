@@ -1,4 +1,4 @@
-# Engine Validation — v0.3
+# Engine Validation — v0.4
 
 Date: 2026-08-18
 
@@ -8,17 +8,33 @@ Synthetic deterministic layer: **PASS — 44/44 checks in the v0.2 expanded harn
 
 Real-market validation layer: **STARTED. RM-001 (SPY September 2021 Outside 50 / potential outside month) passes the stated rule geometry and sequence using consistent historical data.**
 
+SSS50 operational-state layer: **ADDED.** The focused validator now models INVALID -> STANDBY -> ACTIVE -> COMPLETE in both bullish and bearish directions.
+
 ## Important correction discovered by real-market validation
 The first real example exposed a semantic error in the focused Outside 50 implementation: the 50% condition is a LIVE-PRICE / intrabar condition, not a candle-close confirmation.
-
-The prior focused test used `live.close` as the midpoint trigger. That is now superseded.
 
 Correct behavior:
 - live engine compares `currentPrice` with the previous candle midpoint after one side has been taken;
 - lower-timeframe historical OHLC may prove that the threshold traded intrabar by using the bar high/low;
 - coarse completed OHLC cannot always establish first-side ordering.
 
-`tests/outside-50-rule-validation.js` and `OUTSIDE-50-RULE.md` have been corrected accordingly.
+## SSS50 state clarification
+Public implementation evidence further supports treating SSS50 as a progression rather than a single flag.
+
+The Sarah-created TrendSpider scanner `Strat D 50% Rule Long` identifies the bullish active geometry as:
+- current price/close above the middle of the previous daily range,
+- current low below the previous low,
+- current high still below the previous high.
+
+That maps naturally to a failed 2D that has crossed 50% but has not yet completed the outside day.
+
+The engine now records these states:
+- `INVALID` — no failed-two condition yet,
+- `STANDBY` — one side taken and failed back into prior range, midpoint not yet crossed,
+- `ACTIVE` — failed two + prior midpoint crossed; opposite side is target,
+- `COMPLETE` — both sides of prior candle taken.
+
+See `tests/SSS50-STATE-MACHINE.md` and `tests/outside-50-rule-validation.js`.
 
 ## Synthetic coverage
 - Scenario 1 / inside bar, including equality edges
@@ -64,7 +80,8 @@ See:
 ## Files
 - `tests/engine-validation.js` — original core checks
 - `tests/core-rule-validation-v0.2.js` — expanded 44-check synthetic harness; its embedded Outside 50 close-based helper is superseded by the corrected focused validator
-- `tests/outside-50-rule-validation.js` — corrected focused Outside 50 checks using live price / replay range semantics
+- `tests/outside-50-rule-validation.js` — corrected focused Outside 50 checks using live-price / replay-range semantics plus explicit SSS50 states
+- `tests/SSS50-STATE-MACHINE.md` — state-machine validation note
 - `tests/real-example-spy-2021-09.js` — first real-market replay fixture
 - `tests/REAL-MARKET-VALIDATION.md` — real-market validation log
 - `tests/known-scenarios.json` — deterministic scenario fixtures
