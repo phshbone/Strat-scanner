@@ -1,0 +1,21 @@
+{
+  "version": "0.1",
+  "purpose": "Source-cross-validated structural definitions for TheSTRAT pattern engine. Detection only; target/magnitude rules remain separately validated.",
+  "patterns": [
+    {"id":"REV_22_BULL","sequence":["2D","2U"],"direction":"BULLISH","status":"VALIDATED_STRUCTURE"},
+    {"id":"REV_22_BEAR","sequence":["2U","2D"],"direction":"BEARISH","status":"VALIDATED_STRUCTURE"},
+    {"id":"REV_212_BULL","sequence":["2D","1","2U"],"direction":"BULLISH","status":"VALIDATED_STRUCTURE"},
+    {"id":"REV_212_BEAR","sequence":["2U","1","2D"],"direction":"BEARISH","status":"VALIDATED_STRUCTURE"},
+    {"id":"REV_312_BULL","sequence":["3","1","2U"],"direction":"BULLISH","status":"VALIDATED_STRUCTURE"},
+    {"id":"REV_312_BEAR","sequence":["3","1","2D"],"direction":"BEARISH","status":"VALIDATED_STRUCTURE"},
+    {"id":"MM_212_DOWN","sequence":["2D","1","2D"],"direction":"BEARISH","status":"PRESERVE_SEPARATE_PENDING_OPERATIONAL_VALIDATION"},
+    {"id":"MM_212_UP","sequence":["2U","1","2U"],"direction":"BULLISH","status":"PRESERVE_SEPARATE_PENDING_OPERATIONAL_VALIDATION"},
+    {"id":"REVSTRAT_122_BULL","sequence":["1","2D","2U"],"direction":"BULLISH","status":"PRESERVE_SEPARATE_PENDING_OPERATIONAL_VALIDATION"},
+    {"id":"REVSTRAT_122_BEAR","sequence":["1","2U","2D"],"direction":"BEARISH","status":"PRESERVE_SEPARATE_PENDING_OPERATIONAL_VALIDATION"}
+  ],
+  "notes": [
+    "Pattern detection must not imply a universal target.",
+    "Magnitude/pivot selection is validated independently.",
+    "Measured-move and RevStrat variants are intentionally separate IDs so later source refinement cannot silently change core reversal definitions."
+  ]
+}
