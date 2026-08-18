@@ -1,11 +1,26 @@
-# Engine Validation — v0.2
+# Engine Validation — v0.3
 
 Date: 2026-08-18
 
-Status: **PASS — 44/44 deterministic checks in expanded core validation**
+## Current status
 
-Validated with controlled synthetic OHLC/state fixtures. This layer now covers:
+Synthetic deterministic layer: **PASS — 44/44 checks in the v0.2 expanded harness.**
 
+Real-market validation layer: **STARTED. RM-001 (SPY September 2021 Outside 50 / potential outside month) passes the stated rule geometry and sequence using consistent historical data.**
+
+## Important correction discovered by real-market validation
+The first real example exposed a semantic error in the focused Outside 50 implementation: the 50% condition is a LIVE-PRICE / intrabar condition, not a candle-close confirmation.
+
+The prior focused test used `live.close` as the midpoint trigger. That is now superseded.
+
+Correct behavior:
+- live engine compares `currentPrice` with the previous candle midpoint after one side has been taken;
+- lower-timeframe historical OHLC may prove that the threshold traded intrabar by using the bar high/low;
+- coarse completed OHLC cannot always establish first-side ordering.
+
+`tests/outside-50-rule-validation.js` and `OUTSIDE-50-RULE.md` have been corrected accordingly.
+
+## Synthetic coverage
 - Scenario 1 / inside bar, including equality edges
 - 2U, including equality at prior low
 - 2D, including equality at prior high
@@ -30,33 +45,44 @@ Validated with controlled synthetic OHLC/state fixtures. This layer now covers:
 - Outside 50% target-active state
 - Outside 50% target-hit state
 
-Files:
+## Real-market case RM-001 — SPY September 2021
+Using a consistent adjusted StatMuse series:
+- August high 423.44
+- August low 407.58
+- midpoint 415.51
+- September 2 high 424.36 => prior high taken
+- September 13 low 415.07 => midpoint crossed intraday
+- September 13 close 417.38 => back above midpoint, proving close confirmation must not be required
+- September 20 low 402.10 => prior-month low target taken
 
+A separate unadjusted monthly series corroborates the outside-month geometry. Adjustment conventions differ, so adjusted and unadjusted prices must never be mixed inside one calculation.
+
+See:
+- `tests/real-example-spy-2021-09.js`
+- `tests/REAL-MARKET-VALIDATION.md`
+
+## Files
 - `tests/engine-validation.js` — original core checks
-- `tests/core-rule-validation-v0.2.js` — expanded 44-check validation harness
-- `tests/outside-50-rule-validation.js` — focused SSS50 checks
+- `tests/core-rule-validation-v0.2.js` — expanded 44-check synthetic harness; its embedded Outside 50 close-based helper is superseded by the corrected focused validator
+- `tests/outside-50-rule-validation.js` — corrected focused Outside 50 checks using live price / replay range semantics
+- `tests/real-example-spy-2021-09.js` — first real-market replay fixture
+- `tests/REAL-MARKET-VALIDATION.md` — real-market validation log
 - `tests/known-scenarios.json` — deterministic scenario fixtures
 - `tests/KNOWN-SCENARIOS.md` — fixture documentation
 - `tests/exhaustion-outside50-sequence.md` — exhaustion / reversal / Outside 50 sequence notes
-- `OUTSIDE-50-RULE.md` — operational rule specification
+- `OUTSIDE-50-RULE.md` — operational rule specification v0.3
 
 ## Scope note
+These checks validate rule implementation. They do **not** establish profitability, expectancy, or general statistical edge.
 
-These are deterministic unit checks using synthetic OHLC/state examples. They verify that the implementation returns the expected rule outputs for controlled inputs. They do **not** establish profitability, historical expectancy, or correctness against every real-market edge case.
-
-The expanded v0.2 harness was executed locally with Node and returned **44 pass / 0 fail** before being committed.
-
-## Next validation layer
-
-Use known examples from Rob Smith / Sarah / Alex material and real historical OHLC to verify:
-
-1. exact trigger and target selection on real charts,
+## Next validation work
+Continue with known real examples and historical OHLC to verify:
+1. actionable 2-2 / 2-1-2 / 3-1-2 trigger selection,
 2. live/in-force transitions,
-3. ambiguous outside-bar sequencing using lower-timeframe data,
-4. pivot/magnitude selection,
-5. price exhaustion after magnitude completion,
-6. configurable timeframe groups,
-7. Outside 50% behavior in real multi-timeframe sequences,
-8. lower-timeframe actionable entries that drive higher-timeframe objectives.
+3. pivot/magnitude selection,
+4. price exhaustion after magnitude completion,
+5. multi-timeframe domino sequences,
+6. outside-bar sequence resolution with lower-timeframe data,
+7. configurable timeframe groups on real charts.
 
-The Research Console remains in sample-data mode until this next layer is complete.
+The Research Console remains in sample-data mode until this layer is materially complete.
