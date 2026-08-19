@@ -23,7 +23,13 @@ jobs:
         run: |
           set -euo pipefail
           echo "Running deterministic engine validation harnesses"
-          for f in tests/*validation*.js; do
+          shopt -s nullglob
+          files=(tests/*validation*.js tests/*validation*.mjs)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No validation harnesses found"
+            exit 1
+          fi
+          for f in "${files[@]}"; do
             echo "==> $f"
             node "$f"
           done
