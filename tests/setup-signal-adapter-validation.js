@@ -66,7 +66,7 @@ multi=buildDominoFromSetups({
   now:100,
   selectedTimeframes:['D','60']
 });
-t('mixed directions preserved from core-style setups',multi.domino.dominantDirection,'MIXED');
+t('only active bearish carrier determines dominant direction',multi.domino.dominantDirection,'BEARISH');
 t('bearish chain present',multi.domino.chains.some(x=>x.direction==='BEARISH'),true);
 t('bullish daily inactive when below trigger',multi.adaptedStates.find(x=>x.timeframe==='D').inForce,false);
 
