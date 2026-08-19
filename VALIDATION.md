@@ -1,4 +1,4 @@
-# Engine Validation — v0.24
+# Engine Validation — v0.25
 
 Date: 2026-08-19
 
@@ -22,20 +22,45 @@ Date: 2026-08-19
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Level of Reclaim management — new in v0.24
+## Stat Trading carrier/reclaim transcript cross-check — new in v0.25
 
-New module:
-- `reclaim-management.js`
+New research note:
+- `research/STAT-TRADING-CARRIER-RECLAIM-NOTES.md`
 
-New focused harness:
-- `tests/reclaim-management-validation.js`
+The user supplied a transcript from a Stat Trading video that materially clarifies multi-timeframe confirmation/negation semantics.
 
-New spec:
-- `RECLAIM-MANAGEMENT-SPEC.md`
+High-confidence operational observations from the transcript:
+- a higher-timeframe signal can remain valid while lower timeframes continue to print confirming directional 2s or inside bars that do not reverse against it;
+- an inside bar itself does not negate the carrier — its later break can confirm or negate;
+- a genuine opposing reversal is distinct from ordinary pullback/noise;
+- 3-2 can serve as lower-timeframe execution or reconfirmation into a higher-timeframe objective;
+- the higher-timeframe broadening structure supplies magnitude;
+- reclaim of a meaningful equilibrium/reference level can negate the prior directional expectation and shift the path back through the opposite internal levels;
+- lower-timeframe execution can be managed using the still-valid higher-timeframe carrier rather than reacting to every lower-timeframe fluctuation.
 
-Current TheStrat.ai material confirms that trigger, magnitude, and Level of Reclaim are distinct prices, and that after magnitude the level of defense can be tightened to the nearest valid reclaim when no higher-timeframe carrier is taking over.
+### Important reclaim safeguard
 
-The public indexed docs still do not expose enough detail to derive one universal per-pattern reclaim formula. Therefore this layer consumes only explicit verified reclaim candidates.
+This transcript gives useful reclaim/equilibrium semantics but does **not** prove a universal formal Level-of-Reclaim formula for every setup.
+
+Therefore:
+- do not globally set `levelOfReclaim` equal to equilibrium;
+- do not infer midpoint/structure stop as reclaim;
+- keep `levelOfReclaim = null` until setup-specific geometry is source-verified;
+- treat `equilibriumReclaimed` as a distinct structural state candidate.
+
+### New interpretation-state requirements
+
+Future carrier/management layer should distinguish lower-timeframe states relative to the active carrier:
+- `CONFIRMING`
+- `NEUTRAL_INSIDE`
+- `OPPOSING_REVERSAL_FORMING`
+- `OPPOSING_REVERSAL_IN_FORCE`
+
+This is more precise than generic "momentum weakening" and directly supports the warning-card architecture.
+
+## Level of Reclaim management
+
+`reclaim-management.js` consumes only explicit verified reclaim candidates.
 
 Deterministic selection:
 - bullish trade -> nearest defensive reclaim = highest verified reclaim below current price;
@@ -49,16 +74,11 @@ Management states:
 - `TIGHTEN_TO_NEAREST_RECLAIM`
 - `RECLAIM_BREACHED`
 
-The module does not derive reclaim from midpoint stop, structure stop, or arbitrary pivots.
+The module does not derive reclaim from midpoint stop, structure stop, arbitrary pivots, or equilibrium without source verification.
 
-Focused local Node execution: **19/19 PASS**.
+## TheStrat.ai documentation audit
 
-## TheStrat.ai documentation audit — v0.5
-
-Audit file:
-- `research/THESTRAT-AI-DOC-AUDIT-v0.2.md` (content advanced to v0.5)
-
-Current high-value findings:
+Current high-value findings remain:
 - continuity = evidence, signal = timing, broadening formation = map/magnitude;
 - time expiration and price completion are separate;
 - multiple timeframes can independently carry a thesis;
@@ -123,13 +143,18 @@ Management path:
 
 `SOURCE-VERIFIED RECLAIM LEVELS -> NEAREST DEFENSIVE RECLAIM -> MANAGEMENT STATE -> GUIDANCE CARD / FUTURE RULE ENGINE`
 
+Carrier interpretation path (new requirement):
+
+`ACTIVE HIGHER-TF CARRIER -> LOWER-TF CONFIRM / INSIDE / OPPOSING REVERSAL / EQUILIBRIUM RECLAIM -> INTERPRETATION STATE -> GUIDANCE CARD`
+
 ## Next validation/build work
 
-1. source-verify exact reclaim geometry from the 2-2 / 2-1-2 / 3-1-2 visuals; request only the specific clip if the site animation cannot be recovered;
-2. execute the schema/adapter harnesses in the local Node environment and repair any failures;
-3. validate lower-to-higher timeframe carrier advancement on real historical charts;
-4. add explicit timeframe/session/bar-anchor metadata to the data model;
-5. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
-6. use those historical records to measure management-card states rather than guessing their effectiveness.
+1. implement the lower-timeframe relative-to-carrier interpretation state using the new transcript semantics;
+2. continue source-verifying exact reclaim geometry from 2-2 / 2-1-2 / 3-1-2 visuals and Alex/Sarah material;
+3. execute schema/adapter harnesses in an available Node/CI environment and repair any failures;
+4. validate lower-to-higher timeframe carrier advancement and negation on real historical charts;
+5. add explicit timeframe/session/bar-anchor metadata to the data model;
+6. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
+7. use historical records to measure management-card states rather than guessing their effectiveness.
 
 The Research Console remains in sample-data mode until real-market validation and data-semantics layers are materially complete.
