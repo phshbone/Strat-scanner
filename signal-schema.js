@@ -7,10 +7,12 @@ function validDirection(d){ return d==="BULLISH" || d==="BEARISH"; }
   Normalized actionable-signal schema.
 
   Important: levelOfReclaim is a first-class field, but this module deliberately
-  does not calculate it. Current TheStrat.ai material confirms that reclaim is
-  distinct from trigger and magnitude; the exact per-pattern geometry remains
-  under source audit. Unknown reclaim must stay null rather than being inferred
-  from midpointStop or structureStop.
+  does not calculate it. Unknown reclaim must stay null rather than being
+  inferred from midpointStop or structureStop.
+
+  Data-construction semantics are also preserved as first-class provenance so
+  a signal can always be traced back to the exact timeframe/session/aggregation
+  rules that created its source bars.
 */
 function normalizeSignal(input={}){
   if(!validDirection(input.direction)) throw new Error("direction must be BULLISH or BEARISH");
@@ -37,6 +39,8 @@ function normalizeSignal(input={}){
     reference:input.reference || null,
     currentType:input.currentType || null,
     pathResolved:input.pathResolved!==false,
+    dataSemantics:input.dataSemantics || null,
+    semanticKey:input.semanticKey || input.dataSemantics?.semanticKey || null,
     metadata:input.metadata || null
   };
 }
