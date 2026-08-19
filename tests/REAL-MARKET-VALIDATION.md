@@ -111,9 +111,63 @@ PASS for:
 
 This validates implementation on two real examples only. It does not establish a historical success rate or expectancy.
 
+---
+
+## Case RM-003 — SPY November 2021 daily 2-1-2 reversals
+
+Historical source: adjusted SPY daily OHLC from StatMuse for November 2021. Code fixture: `tests/real-example-spy-2021-11-2-1-2.js`.
+
+### RM-003A — bearish 2-1-2 on November 9
+Relevant bars:
+- Nov 4: H 437.86 / L 435.98
+- Nov 5: H 441.28 / L 437.78 => 2U vs Nov 4
+- Nov 8: H 440.89 / L 438.99 => inside (`1`) vs Nov 5
+- Nov 9: H 440.27 / L 436.81 => 2D vs Nov 8
+
+Engine result:
+- setup: bearish `2-1-2`
+- trigger: Nov 8 low = 438.99
+- source range for first magnitude: Nov 5
+- first magnitude: Nov 5 low = 437.78
+- midpoint stop on inside/reference bar: 439.94
+- structure stop: Nov 8 high = 440.89
+
+Outcome comparison:
+- Nov 9 traded below the 437.78 magnitude and above the 439.94 midpoint stop inside the same daily bar;
+- daily OHLC cannot establish which was first;
+- midpoint-stop scenario = **AMBIGUOUS**;
+- Nov 9 did not take the 440.89 structure stop, so structure-stop scenario = **WIN**.
+
+### RM-003B — bullish 2-1-2 on November 12
+Relevant bars:
+- Nov 9: H 440.27 / L 436.81
+- Nov 10: H 438.22 / L 433.21 => 2D vs Nov 9
+- Nov 11: H 436.26 / L 434.81 => inside (`1`) vs Nov 10
+- Nov 12: H 438.67 / L 435.15 => 2U vs Nov 11
+
+Engine result:
+- setup: bullish `2-1-2`
+- trigger: Nov 11 high = 436.26
+- source range for first magnitude: Nov 10
+- first magnitude: Nov 10 high = 438.22
+- midpoint stop on inside/reference bar: 435.535
+- structure stop: Nov 11 low = 434.81
+
+Outcome comparison:
+- Nov 12 traded above the 438.22 magnitude and below the 435.535 midpoint stop in the same daily bar;
+- daily OHLC again cannot determine which occurred first;
+- midpoint-stop scenario = **AMBIGUOUS**;
+- Nov 12 did not reach the 434.81 structure stop, so structure-stop scenario = **WIN**.
+
+### Status
+The real 2-1-2 fixture confirms both bullish and bearish setup detection and the current first-magnitude geometry. It also reinforces the need to keep same-bar path ambiguity explicit when testing tighter stop models from daily OHLC.
+
+This is implementation validation, not a success-rate claim.
+
 ### Web sources consulted
 - StatMuse, SPY August 2021 daily history
 - StatMuse, SPY September 2021 daily history
+- StatMuse, SPY November 2021 daily history
 - Kabutan US, SPY monthly historical prices
 
 Retrieved: 2026-08-18 to 2026-08-19.
