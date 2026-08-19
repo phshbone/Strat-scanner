@@ -1,4 +1,4 @@
-# Engine Validation — v0.29
+# Engine Validation — v0.30
 
 Date: 2026-08-19
 
@@ -17,18 +17,84 @@ Date: 2026-08-19
 - PMG -> production objective integration: **16/16 PASS locally** in `tests/pmg-objective-pipeline-validation.js`.
 - Actionable signal lifecycle layer: **25/25 PASS locally** in `tests/signal-lifecycle-validation.js`.
 - Level of Reclaim management selection layer: **19/19 PASS locally** in `tests/reclaim-management-validation.js`.
+- Range-aware reclaim state/schema layer: **24/24 PASS locally** in `tests/range-reclaim-validation.js`.
 - Normalized actionable-signal schema: focused harness exists in `tests/signal-schema-validation.js`; not re-run in this tool session.
 - Core setup -> signal -> lifecycle -> domino adapter: focused harness exists in `tests/setup-signal-adapter-validation.js`; not re-run in this tool session.
 - Carrier-relative interpretation engine: focused harness added in `tests/carrier-interpretation-validation.js`; not yet executed in this tool session.
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Rob Smith Tuesday Strat Attack — operational refinement in v0.29
+## Range-aware reclaim engine — new in v0.30
 
-New direct-source research note:
+New module:
+- `range-reclaim.js`
+
+New focused harness:
+- `tests/range-reclaim-validation.js`
+
+New specification:
+- `RANGE-RECLAIM-SPEC.md`
+
+This is the first production module that implements reclaim as an explicit structural range traversal rather than as a setup-only placeholder.
+
+Structural path:
+
+`PRIOR VERIFIED RANGE -> RECLAIM BOUNDARY -> RANGE RE-ENTRY -> OPPOSITE BOUNDARY OBJECTIVE -> COMPLETION / FAILURE`
+
+### Bullish reclaim traversal
+
+For an upstream-verified prior range `[low, high]`:
+- reclaim boundary = range low;
+- re-entry requires price strictly above the low;
+- opposite-boundary objective = range high;
+- target is complete at or above the high;
+- after a previously active reclaim, returning to or below the low marks reclaim failure.
+
+### Bearish reclaim traversal
+
+For an upstream-verified prior range `[low, high]`:
+- reclaim boundary = range high;
+- re-entry requires price strictly below the high;
+- opposite-boundary objective = range low;
+- target is complete at or below the low;
+- after a previously active reclaim, returning to or above the high marks reclaim failure.
+
+### Reclaim states
+
+- `NO_VERIFIED_RECLAIM_RANGE`
+- `RANGE_RECLAIM_PENDING`
+- `TRAVERSING_RECLAIMED_RANGE`
+- `RECLAIM_RANGE_TARGET_HIT`
+- `RECLAIM_RANGE_FAILED`
+
+### Objective emission
+
+An actively reclaimed range emits a structural objective with:
+- source type `RECLAIMED_RANGE_OPPOSITE_BOUNDARY`;
+- exact opposite range boundary as price;
+- source range ID;
+- source timeframe;
+- consumed state when the opposite side is reached.
+
+`buildReclaimStack()` also supports multiple nested verified ranges and orders active objectives by actual price path rather than timeframe prestige.
+
+### Safeguards
+
+- the module does not declare every historical range a valid reclaim range;
+- source range must be explicit and `verified=true`;
+- reclaim is not midpoint stop;
+- reclaim is not structure stop;
+- reclaim is not automatically a setup-candle open/close;
+- reclaim alone is not an entry signal;
+- nested prior ranges may coexist;
+- completion produces price-exhaustion context, not an automatic reversal.
+
+Focused local Node execution on 2026-08-19: **24/24 PASS**.
+
+## Rob Smith Tuesday Strat Attack — operational refinement
+
+Direct-source research note:
 - `research/ROB-SMITH-TUESDAY-STRAT-ATTACK-OPERATIONAL-NOTES.md`
-
-This briefing is useful because it shows Rob applying the system in real time rather than defining it abstractly.
 
 High-value operational confirmations/refinements:
 - breadth / simultaneous-break logic is explicitly based on counting which weekly/daily ranges are being taken in each direction;
@@ -41,21 +107,6 @@ High-value operational confirmations/refinements:
 - 60-minute signals can remain principal while 30-minute reversals supply tactical entries;
 - outside-range side tests, rejection, reclaim, and reversal should remain distinct structural states;
 - holiday / year-end participation context may matter as advisory metadata but should not imply direction.
-
-### New state/event candidates
-
-Future advisory/event layer may include:
-- `BREADTH_ALIGNED_BULLISH`
-- `BREADTH_ALIGNED_BEARISH`
-- `BREADTH_MIXED`
-- `INSIDE_RANGE_UNRESOLVED`
-- `WAIT_NO_ACTIONABLE_SETUP`
-- `PERIOD_OPEN_RESET`
-- `OPENING_NOISE_CONTEXT` (profile-configurable advisory only)
-- `RANGE_SIDE_REJECTED`
-- `RANGE_SIDE_RECLAIMED`
-
-No universal breadth threshold or mandatory opening delay has been encoded.
 
 ## Rob Smith FinTwit seminar — canonical reinforcement
 
@@ -104,16 +155,6 @@ States include:
 - `MOTHER_BAR_CONFINED`
 - `RANGE_EXIT_CONFIRMING`
 
-Rob's direct daily briefing further supports keeping ordinary lower-timeframe opposition distinct from true higher-timeframe negation and allowing explicit unresolved/wait states.
-
-## Strat Soldier Levels of Reclaim — current conceptual model
-
-Operational model remains:
-
-`PRIOR OUTSIDE / BROADENING RANGE -> RECLAIM BOUNDARY -> RANGE RE-ENTERED -> OPPOSITE SIDE OF PRIOR RANGE -> RANGE COMPLETE / PRICE EXHAUSTION`
-
-The Rob seminar's failed-2/outside-bar discussion further supports preserving the exact source range whenever the opposite boundary is promoted as magnitude.
-
 ## Production paths
 
 Signal path:
@@ -126,11 +167,11 @@ Carrier interpretation path:
 
 Objective path:
 
-`SETUP MAGNITUDE -> STRUCTURAL TARGETS / PMG LEVELS -> TARGET HIERARCHY -> OBJECTIVE STATE -> PRICE EXHAUSTION`
+`SETUP MAGNITUDE -> STRUCTURAL TARGETS / PMG LEVELS / RECLAIMED-RANGE OBJECTIVES -> TARGET HIERARCHY -> OBJECTIVE STATE -> PRICE EXHAUSTION`
 
 Reclaim path:
 
-`PRIOR RANGE / OUTSIDE BAR -> VERIFIED RECLAIM BOUNDARY -> RANGE RE-ENTRY STATE -> OPPOSITE RANGE OBJECTIVE -> MANAGEMENT / GUIDANCE`
+`PRIOR VERIFIED RANGE -> RECLAIM BOUNDARY -> RANGE RE-ENTRY STATE -> OPPOSITE RANGE OBJECTIVE -> COMPLETION / FAILURE -> MANAGEMENT / GUIDANCE`
 
 Data path requirement:
 
@@ -142,14 +183,13 @@ Breadth path requirement:
 
 ## Next validation/build work
 
-1. implement a range-aware reclaim state/schema module;
+1. connect range-reclaim objectives into the existing target hierarchy / objective-exhaustion pipeline;
 2. add explicit timeframe/session/bar-anchor/period-open metadata to the data model before broader intraday historical validation;
-3. connect reclaim range completion into the objective/exhaustion layer;
-4. execute carrier-interpretation/schema/adapter harnesses in Node or CI and repair failures;
-5. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
-6. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including an explicit mixed-breadth state;
-7. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome rather than forcing a trade suggestion;
-8. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
-9. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
+3. execute carrier-interpretation/schema/adapter harnesses in Node or CI and repair failures;
+4. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
+5. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including an explicit mixed-breadth state;
+6. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome rather than forcing a trade suggestion;
+7. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
+8. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
 
 The Research Console remains in sample-data mode until real-market validation and data-semantics layers are materially complete.
