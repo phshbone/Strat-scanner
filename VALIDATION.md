@@ -1,4 +1,4 @@
-# Engine Validation — v0.7
+# Engine Validation — v0.8
 
 Date: 2026-08-19
 
@@ -8,7 +8,9 @@ Synthetic deterministic layer: **PASS — 44/44 checks in the legacy v0.2 expand
 
 Corrected core-engine layer: **PASS — 15/15 focused checks in `tests/core-engine-v0.3-validation.js`.** This layer removes the old directional Scenario-3 conflation and uses the cleaned `midpointStop` / `magnitude` terminology.
 
-Research Console integration layer: **WIRED.** `index.html` now loads `core-engine-v0.3.js` as the deterministic source of truth instead of carrying the superseded inline setup engine.
+Research Console integration layer: **WIRED.** `index.html` loads `core-engine-v0.3.js` as the deterministic source of truth instead of carrying the superseded inline setup engine.
+
+Setup-specific first-magnitude layer: **ADDED — 10/10 focused checks pass locally.** `setup-magnitude.js` now isolates the first objective for validated 2-2, 2-1-2, and 3-1-2 setup families from the later generic target stack.
 
 Real-market validation layer: **STARTED. RM-001 (SPY September 2021 Outside 50 / potential outside month) passes the stated rule geometry and sequence using consistent historical data.**
 
@@ -24,11 +26,28 @@ The live sample console now:
 - displays `OUTSIDE PATH AMBIGUOUS` when completed OHLC cannot establish sequence;
 - accepts optional `currentBarPathDirection` only when lower-timeframe/tick evidence establishes which side broke first;
 - displays **Magnitude** rather than generic T1/target wording for the setup-defined first objective;
-- displays **Midpoint Stop** rather than `50% stop`, keeping it distinct from Sarah's SSS50 rule;
+- displays **Midpoint Stop** to distinguish the management midpoint from Sarah's SSS50 / 50% Potential Outside rule;
 - displays explicit path-resolution state in the Monitor view;
-- keeps the console in SAMPLE DATA mode.
+- remains in SAMPLE DATA mode.
 
-The browser-side inline UI script was syntax-checked before commit.
+## Setup-specific first magnitude
+
+A separate selector now expresses the sourced setup geometry before the general pivot stack is considered.
+
+For the currently validated setup families:
+- bullish 2-2 -> source-range high;
+- bearish 2-2 -> source-range low;
+- bullish 2-1-2 -> source-range high;
+- bearish 2-1-2 -> source-range low;
+- bullish 3-1-2 -> source-range high;
+- bearish 3-1-2 -> source-range low.
+
+The selector returns `null` for unsupported setup families, missing source ranges, or unresolved direction instead of inventing an objective.
+
+See:
+- `setup-magnitude.js`
+- `tests/setup-magnitude-validation-v0.1.js`
+- `tests/SETUP-MAGNITUDE-VALIDATION.md`
 
 ## Core correction: completed Scenario 3 is path-ambiguous
 
@@ -39,11 +58,9 @@ Correct behavior in `core-engine-v0.3.js`:
 - if lower-timeframe/tick path proves sequence, the caller may pass `currentBarPathDirection` and resolve the setup;
 - otherwise the engine returns `OUTSIDE PATH AMBIGUOUS` / `UNKNOWN`.
 
-This aligns the core engine with the same sequence discipline already used for failed-2 / SSS50 historical replay.
-
 ## Important correction discovered by real-market validation
 
-The first real example exposed a semantic error in the focused Outside 50 implementation: the 50% condition is a LIVE-PRICE / intrabar condition, not a candle-close confirmation.
+Outside 50 confirmation is a LIVE-PRICE / intrabar condition, not a candle-close confirmation.
 
 Correct behavior:
 - live engine compares `currentPrice` with the previous candle midpoint after one side has been taken;
@@ -63,51 +80,14 @@ The engine records:
 Terminology:
 - `magnitude` = first expected objective tied to the active setup/range;
 - `targets` = further valid objectives beyond magnitude;
-- `midpointStop` = optional management midpoint stop; do not call it the 50% rule.
+- `midpointStop` = optional management midpoint stop; do not confuse it with SSS50.
 
-The magnitude engine is split into two responsibilities:
-1. **Pivot/setup objective identification** — source-backed rules are substantially locked from Rob Smith and Alex material; real-chart validation continues.
-2. **Target-stack mechanics** — deterministic and tested.
+The magnitude system is split into three responsibilities:
+1. **Setup-specific first magnitude** — deterministic for the currently validated setup families.
+2. **Pivot/target identification** — source-backed rules are substantially locked; real-chart validation continues.
+3. **Target-stack mechanics** — deterministic and tested.
 
-Given an origin price, direction, and list of validated pivots:
-- bullish stack = pivots above origin, nearest first;
-- bearish stack = pivots below origin, nearest first;
-- reached objectives are consumed;
-- next remaining objective is promoted;
-- no remaining directional pivots => `exhaustionRisk = true`.
-
-Exhaustion is context only, not an automatic reversal signal.
-
-## Synthetic coverage
-
-- Scenario 1 / inside bar, including equality edges
-- 2U, including equality at prior low
-- 2D, including equality at prior high
-- Scenario 3 / outside bar
-- completed Scenario-3 path ambiguity
-- path-resolved bullish and bearish 3 transitions
-- configurable FTFC group sizes
-- neutral/tied FTFC state
-- bullish and bearish 2-2 reversals
-- bullish and bearish 2-1-2 reversals
-- bullish and bearish 3-1-2 reversals
-- pending inside-bar break
-- bullish and bearish in-force behavior
-- strict out-of-force behavior at the trigger
-- midpoint-stop calculation
-- structure-stop calculation
-- magnitude-hit equality behavior
-- time-exhaustion boundaries and clamping
-- bullish and bearish Outside 50% confirmation
-- Outside 50% non-confirmation before midpoint
-- unknown outside-bar sequence when OHLC cannot reveal first side taken
-- exhaustion state
-- exhaustion + opposing reversal state
-- Outside 50% target-active state
-- Outside 50% target-hit state
-- bullish and bearish directional pivot-stack ordering
-- target consumption and promotion
-- exhaustion after directional stack is cleared
+Exhaustion remains context only, not an automatic reversal signal.
 
 ## Real-market case RM-001 — SPY September 2021
 
@@ -122,34 +102,15 @@ Using a consistent adjusted StatMuse series:
 
 A separate unadjusted monthly series corroborates the outside-month geometry. Adjustment conventions differ, so adjusted and unadjusted prices must never be mixed inside one calculation.
 
-## Files
-
-- `index.html` — Research Console v0.2, now wired to corrected core engine
-- `core-engine-v0.3.js` — corrected core engine; Scenario-3 direction requires path evidence
-- `tests/core-engine-v0.3-validation.js` — 15 focused checks for path ambiguity, setup preservation, strict in-force semantics, magnitude, and midpoint-stop terminology
-- `tests/engine-validation.js` — original core checks
-- `tests/core-rule-validation-v0.2.js` — legacy expanded 44-check synthetic harness; retained for regression history, but its completed-3 directional shortcuts and embedded Outside 50 close-based helper are superseded
-- `tests/outside-50-rule-validation.js` — corrected focused Outside 50 checks using live-price / replay-range semantics plus explicit SSS50 states
-- `tests/SSS50-STATE-MACHINE.md` — state-machine validation note
-- `tests/real-example-spy-2021-09.js` — first real-market replay fixture
-- `tests/REAL-MARKET-VALIDATION.md` — real-market validation log
-- `tests/known-scenarios.json` — deterministic scenario fixtures
-- `tests/KNOWN-SCENARIOS.md` — fixture documentation
-- `tests/exhaustion-outside50-sequence.md` — exhaustion / reversal / Outside 50 sequence notes
-- `OUTSIDE-50-RULE.md` — operational rule specification
-- `magnitude.js` — deterministic target-stack engine
-- `tests/magnitude-validation.js` — magnitude stack tests
-- `MAGNITUDE-SPEC.md` — source-backed magnitude/pivot specification
-
 ## Scope note
 
 These checks validate rule implementation. They do **not** establish profitability, expectancy, or general statistical edge.
 
 ## Next validation work
 
-1. validate setup-specific first magnitude on real 2-2 examples;
-2. validate setup-specific first magnitude on real 2-1-2 examples;
-3. validate setup-specific first magnitude on real 3-1-2 examples;
+1. build real historical OHLC fixtures for 2-2 and confirm the selected source range / first magnitude;
+2. repeat for 2-1-2;
+3. repeat for 3-1-2;
 4. validate price exhaustion after magnitude completion;
 5. validate multi-timeframe domino sequences;
 6. validate outside-bar sequence resolution with lower-timeframe data;
