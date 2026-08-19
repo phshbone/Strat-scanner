@@ -1,4 +1,4 @@
-# Engine Validation — v0.25
+# Engine Validation — v0.26
 
 Date: 2026-08-19
 
@@ -22,63 +22,80 @@ Date: 2026-08-19
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Stat Trading carrier/reclaim transcript cross-check — new in v0.25
+## Strat Soldier Levels of Reclaim — major conceptual refinement in v0.26
 
 New research note:
-- `research/STAT-TRADING-CARRIER-RECLAIM-NOTES.md`
+- `research/STRAT-SOLDIER-LEVELS-OF-RECLAIM-NOTES.md`
 
-The user supplied a transcript from a Stat Trading video that materially clarifies multi-timeframe confirmation/negation semantics.
+User supplied a transcript from Jermaine / Strat Soldier explicitly describing Levels of Reclaim as material from Rob Smith's original 2018 course.
 
-High-confidence operational observations from the transcript:
-- a higher-timeframe signal can remain valid while lower timeframes continue to print confirming directional 2s or inside bars that do not reverse against it;
-- an inside bar itself does not negate the carrier — its later break can confirm or negate;
-- a genuine opposing reversal is distinct from ordinary pullback/noise;
-- 3-2 can serve as lower-timeframe execution or reconfirmation into a higher-timeframe objective;
-- the higher-timeframe broadening structure supplies magnitude;
-- reclaim of a meaningful equilibrium/reference level can negate the prior directional expectation and shift the path back through the opposite internal levels;
-- lower-timeframe execution can be managed using the still-valid higher-timeframe carrier rather than reacting to every lower-timeframe fluctuation.
+The transcript resolves the main conceptual ambiguity: **Level of Reclaim is best modeled as a range-relative structural threshold, not as one universal setup-only formula.**
 
-### Important reclaim safeguard
+Operational model:
 
-This transcript gives useful reclaim/equilibrium semantics but does **not** prove a universal formal Level-of-Reclaim formula for every setup.
+`PRIOR OUTSIDE / BROADENING RANGE -> RECLAIM BOUNDARY -> RANGE RE-ENTERED -> OPPOSITE SIDE OF PRIOR RANGE -> RANGE COMPLETE / PRICE EXHAUSTION`
 
-Therefore:
-- do not globally set `levelOfReclaim` equal to equilibrium;
-- do not infer midpoint/structure stop as reclaim;
-- keep `levelOfReclaim = null` until setup-specific geometry is source-verified;
-- treat `equilibriumReclaimed` as a distinct structural state candidate.
+Confirmed safeguards:
+- reclaim is not midpoint stop;
+- reclaim is not structure stop;
+- reclaim is not automatically the signal candle's open/close;
+- reclaim by itself is not an entry signal;
+- the source prior range/timeframe must be preserved;
+- multiple nested reclaim levels can coexist;
+- actionable signals + continuity remain the participation layer;
+- after a verified reclaim into a prior range, the opposite side becomes the structural objective for that reclaim context;
+- completion of the reclaimed range creates price-exhaustion context, not an automatic reversal prediction.
 
-### New interpretation-state requirements
+This changes the upstream reclaim-generation model but does **not** invalidate `reclaim-management.js`. That module can still select the nearest verified defensive reclaim; verified candidates should increasingly be generated from explicit prior-range objects.
 
-Future carrier/management layer should distinguish lower-timeframe states relative to the active carrier:
+Planned range-aware reclaim fields:
+- `reclaimId`
+- `sourceRangeId`
+- `sourceTimeframe`
+- `reclaimPrice`
+- `direction`
+- `rangeHigh`
+- `rangeLow`
+- `oppositeBoundary`
+- `verified`
+- `source`
+- `consumed`
+- `failed`
+
+Planned structural states:
+- `RANGE_RECLAIM_PENDING`
+- `RANGE_RECLAIMED`
+- `TRAVERSING_RECLAIMED_RANGE`
+- `RECLAIM_RANGE_TARGET_HIT`
+- `RECLAIM_RANGE_FAILED`
+
+## Carrier/reconfirmation refinement
+
+Recent Stat Trading material plus the Strat Soldier reclaim transcript support a cleaner lower-vs-higher-timeframe interpretation model.
+
+A higher-timeframe carrier can remain intact while lower timeframes are:
 - `CONFIRMING`
 - `NEUTRAL_INSIDE`
+
+Actual threat states remain distinct:
 - `OPPOSING_REVERSAL_FORMING`
 - `OPPOSING_REVERSAL_IN_FORCE`
 
-This is more precise than generic "momentum weakening" and directly supports the warning-card architecture.
+Range reclaim adds a separate structural axis:
+- `RANGE_RECLAIM_PENDING`
+- `RANGE_RECLAIMED`
+- `RECLAIM_RANGE_FAILED`
 
-## Level of Reclaim management
+This is more precise than generic momentum-weakening warnings and should feed the guidance-card layer directly.
 
-`reclaim-management.js` consumes only explicit verified reclaim candidates.
+## TheStrat.ai documentation audit — v0.6
 
-Deterministic selection:
-- bullish trade -> nearest defensive reclaim = highest verified reclaim below current price;
-- bearish trade -> nearest defensive reclaim = lowest verified reclaim above current price;
-- equality at reclaim counts as a defensive-boundary breach;
-- unverified candidates cannot drive guidance.
+Audit file:
+- `research/THESTRAT-AI-DOC-AUDIT-v0.2.md` (content advanced to v0.6)
 
-Management states:
-- `NO_RECLAIM_GUIDANCE`
-- `RECLAIM_AVAILABLE`
-- `TIGHTEN_TO_NEAREST_RECLAIM`
-- `RECLAIM_BREACHED`
+The prior search for a universal reclaim formula has been reframed. Exact reclaim prices still require source-range geometry, but the architecture no longer depends on a single formula for every 2-2 / 2-1-2 / 3-1-2 variation.
 
-The module does not derive reclaim from midpoint stop, structure stop, arbitrary pivots, or equilibrium without source verification.
-
-## TheStrat.ai documentation audit
-
-Current high-value findings remain:
+Current high-value findings:
 - continuity = evidence, signal = timing, broadening formation = map/magnitude;
 - time expiration and price completion are separate;
 - multiple timeframes can independently carry a thesis;
@@ -86,48 +103,8 @@ Current high-value findings remain:
 - 3-2 carries no setup-defined magnitude and must borrow a higher-timeframe objective;
 - kicker is not standalone and requires fast lower-timeframe reconfirmation;
 - prior-range pivots support PMG/target-fuel context;
-- after magnitude, defense can tighten to the nearest valid reclaim;
-- exact reclaim geometry for 2-2 / 2-1-2 / 3-1-2 / hammer / shooter remains source-unresolved.
-
-## PMG objective integration
-
-Production chain:
-
-`PMG GEOMETRY -> MATCHING STRAT REVERSAL IN FORCE -> SETUP MAGNITUDE -> PMG TARGET STACK -> OBJECTIVE STATE -> PRICE EXHAUSTION`
-
-PMG geometry alone is not actionable, and no universal PMG spacing threshold is invented.
-
-## Core setup -> signal -> domino integration
-
-Production signal path:
-
-`CORE SETUP -> NORMALIZED SIGNAL -> SIGNAL LIFECYCLE -> DOMINO / CARRIER STATE`
-
-Safeguards:
-- setup trigger/direction/magnitude are preserved;
-- non-directional or ambiguous setups do not become actionable signals;
-- lifecycle determines active carrier status;
-- higher timeframes activate only through their own observable trigger;
-- mixed-direction timeframe states remain visible;
-- thesis and execution timeframe identity remain separate;
-- Level of Reclaim is never invented by the adapter.
-
-## Exhaustion terminology
-
-Time exhaustion and price exhaustion remain separate.
-
-- Time exhaustion = how much time remains in the active signal bar.
-- Price exhaustion = magnitude completion / fresh-extreme / currently-cleared objective context.
-
-Neither is an automatic reversal signal.
-
-## Timeframe / domino state
-
-Supported ladder:
-
-`Y -> Q -> M -> W -> D -> 60 -> 30 -> 15 -> 5`
-
-Yearly and Quarterly remain supported but not mandatory filters. Lower timeframes cannot falsely activate higher-timeframe triggers.
+- reclaim is a structural gateway into a prior range;
+- the opposite side of that reclaimed range becomes the structural objective.
 
 ## Production paths
 
@@ -139,22 +116,22 @@ Objective path:
 
 `SETUP MAGNITUDE -> STRUCTURAL TARGETS / PMG LEVELS -> TARGET HIERARCHY -> OBJECTIVE STATE -> PRICE EXHAUSTION`
 
+Reclaim path:
+
+`PRIOR RANGE / OUTSIDE BAR -> VERIFIED RECLAIM BOUNDARY -> RANGE RE-ENTRY STATE -> OPPOSITE RANGE OBJECTIVE -> MANAGEMENT / GUIDANCE`
+
 Management path:
 
-`SOURCE-VERIFIED RECLAIM LEVELS -> NEAREST DEFENSIVE RECLAIM -> MANAGEMENT STATE -> GUIDANCE CARD / FUTURE RULE ENGINE`
-
-Carrier interpretation path (new requirement):
-
-`ACTIVE HIGHER-TF CARRIER -> LOWER-TF CONFIRM / INSIDE / OPPOSING REVERSAL / EQUILIBRIUM RECLAIM -> INTERPRETATION STATE -> GUIDANCE CARD`
+`VERIFIED RECLAIM LEVELS -> NEAREST DEFENSIVE RECLAIM -> MANAGEMENT STATE -> GUIDANCE CARD / FUTURE RULE ENGINE`
 
 ## Next validation/build work
 
-1. implement the lower-timeframe relative-to-carrier interpretation state using the new transcript semantics;
-2. continue source-verifying exact reclaim geometry from 2-2 / 2-1-2 / 3-1-2 visuals and Alex/Sarah material;
-3. execute schema/adapter harnesses in an available Node/CI environment and repair any failures;
-4. validate lower-to-higher timeframe carrier advancement and negation on real historical charts;
-5. add explicit timeframe/session/bar-anchor metadata to the data model;
-6. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
-7. use historical records to measure management-card states rather than guessing their effectiveness.
+1. implement a range-aware reclaim state/schema module;
+2. connect reclaim range completion into the objective/exhaustion layer;
+3. implement carrier-relative lower-timeframe interpretation states;
+4. inspect 2-2 / 2-1-2 / 3-1-2 visuals to map reclaim lines to explicit prior ranges;
+5. validate lower-to-higher timeframe carrier advancement/negation on real historical charts;
+6. add explicit timeframe/session/bar-anchor metadata to the data model;
+7. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
 
 The Research Console remains in sample-data mode until real-market validation and data-semantics layers are materially complete.
