@@ -55,13 +55,18 @@ function markTargetsConsumed({originPrice,currentPrice,direction,pivots}){
   }));
 }
 
-/* Legacy behavior retained for regression history. */
+/*
+  Legacy target-stack helper. `exhaustionRisk` is retained for compatibility;
+  the precise meaning here is price/structure exhaustion, not time exhaustion.
+*/
 function selectNextMagnitudeTarget({originPrice,currentPrice,direction,pivots}){
   const stack=markTargetsConsumed({originPrice,currentPrice,direction,pivots});
   const remaining=stack.filter(p=>p.consumed!==true);
+  const priceExhaustionRisk=remaining.length===0;
   return {
     target:remaining[0]||null,
-    exhaustionRisk:remaining.length===0,
+    priceExhaustionRisk,
+    exhaustionRisk:priceExhaustionRisk,
     remainingTargets:remaining.length,
     stack
   };
@@ -76,7 +81,8 @@ function buildMagnitudeState(args){
     stack:next.stack,
     nextTarget:next.target,
     remainingTargets:next.remainingTargets,
-    exhaustionRisk:next.exhaustionRisk
+    priceExhaustionRisk:next.priceExhaustionRisk,
+    exhaustionRisk:next.priceExhaustionRisk
   };
 }
 
@@ -86,10 +92,13 @@ function buildMagnitudeState(args){
   magnitude = setup/range-defined first objective.
   targets   = only structurally qualified objectives beyond magnitude.
 
-  Exhaustion risk becomes true only after magnitude has been reached AND the
-  currently-qualified target structure is cleared. If magnitude has not been
-  reached yet, the move is not "post-magnitude exhausted" merely because no
-  extra target has been qualified.
+  `priceExhaustionRisk` becomes true only after magnitude has been reached AND
+  the currently-qualified target structure is cleared. This is distinct from
+  time exhaustion, which is calculated from signal-bar time remaining in
+  exhaustion.js.
+
+  `exhaustionRisk` remains as a temporary backward-compatibility alias for
+  `priceExhaustionRisk` while dependent modules migrate.
 */
 function buildObjectiveState({originPrice,currentPrice,direction,magnitude,pivots=[]}){
   const origin=Number(originPrice), current=Number(currentPrice), mag=Number(magnitude);
@@ -113,6 +122,8 @@ function buildObjectiveState({originPrice,currentPrice,direction,magnitude,pivot
     nextObjective=null;
   }
 
+  const priceExhaustionRisk=magnitudeConsumed && remaining.length===0;
+
   return {
     originPrice:origin,
     currentPrice:current,
@@ -121,7 +132,8 @@ function buildObjectiveState({originPrice,currentPrice,direction,magnitude,pivot
     targets,
     remainingTargets:remaining.length,
     nextObjective,
-    exhaustionRisk:magnitudeConsumed && remaining.length===0
+    priceExhaustionRisk,
+    exhaustionRisk:priceExhaustionRisk
   };
 }
 
