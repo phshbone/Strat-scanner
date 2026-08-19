@@ -1,4 +1,4 @@
-# Engine Validation — v0.14
+# Engine Validation — v0.15
 
 Date: 2026-08-19
 
@@ -10,14 +10,53 @@ Date: 2026-08-19
 - Research outcome/scenario layer: **20/20 PASS** in `tests/research-outcomes-validation.js`.
 - Post-magnitude objective/exhaustion layer: **24/24 PASS** in `tests/magnitude-validation.js`.
 - Structural target qualification layer: **19/19 PASS** in `tests/target-qualification-validation.js`.
+- Target hierarchy / de-duplication layer: **18/18 PASS** in `tests/target-hierarchy-validation.js`.
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Structural target qualification — new in v0.14
+## Target hierarchy / de-duplication — new in v0.15
 
-The upstream qualification layer is now implemented in `target-qualification.js`.
+`target-hierarchy.js` now handles competing qualified targets after structural qualification.
 
-Purpose: after the setup-defined first magnitude is reached, decide which broader ranges are structurally eligible to become additional targets before passing them into `magnitude.js`.
+Deterministic behavior:
+1. objective order follows the actual price path, not timeframe prestige;
+2. bullish targets sort nearest-to-farthest upward;
+3. bearish targets sort nearest-to-farthest downward;
+4. multiple qualified structures at the exact same price are merged into one objective level;
+5. merged levels preserve all source ids, timeframes, range ids, and source count;
+6. a merged exact level is considered consumed only when all contributing sources are consumed;
+7. nearby-but-unequal prices are **not** silently merged by default;
+8. optional near-price grouping requires an explicit caller-supplied absolute-price tolerance and is advisory/display-only;
+9. proximity clustering does not alter target prices, structural validity, consumption state, or target order.
+
+This avoids two opposite errors:
+- showing duplicate Daily/Weekly/Monthly lines when they resolve to the exact same objective;
+- inventing an arbitrary cents/percent/ATR tolerance that would collapse distinct nearby objectives without source support.
+
+A higher timeframe does not automatically leapfrog a nearer qualified lower-timeframe target. Higher-timeframe agreement at the same exact level is preserved as supporting evidence rather than assigned an arbitrary weight.
+
+### Focused target-hierarchy validation
+
+`tests/target-hierarchy-validation.js` reports **18/18 PASS locally** and verifies:
+- bullish and bearish path ordering;
+- exact-price de-duplication;
+- preservation of supporting timeframe/range provenance;
+- conservative consumed-state handling;
+- objective numbering;
+- next-target selection after consumed levels;
+- exact-only default behavior;
+- caller-controlled nearby-price clustering;
+- advisory clusters never merging semantic objectives;
+- invalid direction and negative tolerance rejection.
+
+See:
+- `target-hierarchy.js`
+- `tests/target-hierarchy-validation.js`
+- `TARGET-HIERARCHY-SPEC.md`
+
+## Structural target qualification
+
+The upstream qualification layer is implemented in `target-qualification.js`.
 
 A candidate broader range qualifies only when:
 1. it is valid and active;
@@ -29,41 +68,13 @@ Direction symmetry:
 - bullish broader target -> broader range `lowTaken === true`, target = broader range high;
 - bearish broader target -> broader range `highTaken === true`, target = broader range low.
 
-This encodes the sourced restriction that the engine must not project through a larger range merely because a farther pivot exists. If the larger range has not been structurally engaged, it is not promoted.
+This encodes the restriction that the engine must not project through a larger range merely because a farther pivot exists. If the larger range has not been structurally engaged, it is not promoted.
 
-Qualified range boundaries are converted to target objects carrying:
-- `structurallyRelevant: true`
-- `eligibleTarget: true`
-- `source: RANGE_BOUNDARY`
-
-They feed directly into `magnitude.buildObjectiveState()`.
+Qualified boundaries feed through the target-hierarchy layer before entering the production objective state.
 
 State progression is now:
 
-`SETUP-DEFINED MAGNITUDE -> QUALIFIED BROADER TARGET(S) -> EXHAUSTION FOR CURRENT KNOWN STRUCTURE`
-
-If no broader range qualifies after magnitude is reached, the engine marks exhaustion for the currently known active structure rather than inventing a farther target. A later structural change may qualify a new range and rebuild objective state.
-
-### Focused structural validation
-
-`tests/target-qualification-validation.js` reports **19/19 PASS locally** and verifies:
-- strict broader-range containment;
-- rejection of partial overlap;
-- rejection of an identical range as a broader range;
-- bullish/bearish initiating-side prerequisites;
-- exclusion of inactive and invalid ranges;
-- exclusion when the candidate boundary does not extend past magnitude;
-- nearest eligible boundary ordering;
-- direct integration into `magnitude.js`;
-- target consumption and promotion;
-- no silent promotion of an unengaged higher-timeframe range;
-- exhaustion after all currently-qualified structures are cleared.
-
-See:
-- `target-qualification.js`
-- `tests/target-qualification-validation.js`
-- `TARGET-QUALIFICATION-SPEC.md`
-- `magnitude.js`
+`SETUP-DEFINED MAGNITUDE -> QUALIFIED BROADER TARGETS -> HIERARCHY / DE-DUP -> OBJECTIVE STATE -> EXHAUSTION`
 
 ## Post-magnitude objective state
 
@@ -111,17 +122,19 @@ Every reported percentage must retain sample size. Exploratory findings must sur
 - magnitude = setup-defined first objective;
 - targets = further structurally qualified objectives;
 - raw pivots are not guaranteed targets;
+- exact same target price can be merged while preserving source provenance;
+- nearby target prices remain semantically separate unless a caller explicitly requests advisory grouping;
+- timeframe size alone does not override price-path objective order;
 - exhaustion is not a reversal signal;
 - these tests validate implementation, not profitability or historical expectancy.
 
 ## Next validation/build work
 
-1. validate competing higher-timeframe target hierarchy when multiple qualified ranges overlap or share near-identical boundaries;
-2. add deterministic target de-duplication rules for same/near-same levels across timeframes;
-3. validate multi-timeframe domino sequences;
-4. validate outside-bar sequence resolution with lower-timeframe data;
-5. add explicit timeframe/session anchor metadata to the data model;
-6. validate configurable timeframe groups on real charts;
-7. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
+1. validate the full structural pipeline on overlapping multi-timeframe examples: qualification -> hierarchy -> objective state;
+2. validate multi-timeframe domino sequences where a lower-timeframe setup triggers or advances a higher-timeframe setup;
+3. validate outside-bar sequence resolution with lower-timeframe data;
+4. add explicit timeframe/session anchor metadata to the data model;
+5. validate configurable timeframe groups on real charts;
+6. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
 
 The Research Console remains in sample-data mode until the real-market validation and data-semantics layers are materially complete.
