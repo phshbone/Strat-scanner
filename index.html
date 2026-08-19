@@ -1,538 +1,167 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#0b1026" />
-  <title>Trading Research Console v0.1</title>
-  <style>
-    :root{
-      --bg:#090f2b;
-      --panel:#111936;
-      --panel2:#0e1530;
-      --text:#eef2ff;
-      --muted:#9aa6c3;
-      --line:#263251;
-      --good:#5fbf86;
-      --warn:#d7a84a;
-      --bad:#d86c6c;
-      --purple:#a882e8;
-      --yellow:#e0c75a;
-      --blue:#6aa6df;
-      --chip:#17213f;
-      --shadow:0 12px 30px rgba(0,0,0,.22);
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      background:linear-gradient(180deg,#080d24,#0a112c 35%,#090f2b);
-      color:var(--text);
-      min-height:100vh;
-    }
-    button,select,textarea,input{font:inherit}
-    button{cursor:pointer}
-    .app{max-width:1180px;margin:0 auto;padding:18px 14px 88px}
-    .topbar{
-      position:sticky;top:0;z-index:20;
-      margin:-18px -14px 16px;
-      padding:calc(12px + env(safe-area-inset-top)) 14px 12px;
-      background:rgba(9,15,43,.94);
-      border-bottom:1px solid var(--line);
-      backdrop-filter:blur(12px);
-    }
-    .toprow{display:flex;align-items:center;gap:12px;justify-content:space-between;max-width:1180px;margin:0 auto}
-    h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.2px}
-    .subtitle{color:var(--muted);font-size:12px;margin-top:3px}
-    .badge{padding:6px 9px;border-radius:999px;background:#2a1f17;color:#ffd790;border:1px solid #62451e;font-size:11px;font-weight:800}
-    .tabs{display:flex;gap:8px;overflow:auto;padding:2px 0 4px;margin:0 0 16px}
-    .tab{
-      border:1px solid var(--line);background:var(--chip);color:var(--muted);
-      border-radius:10px;padding:9px 12px;font-weight:700;white-space:nowrap
-    }
-    .tab.active{background:#1e2a4d;color:white;border-color:#43557e}
-    .view{display:none}.view.active{display:block}
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
-    .card{
-      grid-column:span 12;background:linear-gradient(180deg,var(--panel),var(--panel2));
-      border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)
-    }
-    @media(min-width:760px){.half{grid-column:span 6}.third{grid-column:span 4}.twoThird{grid-column:span 8}}
-    .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.11em;color:#b8c4e2;margin:0 0 12px}
-    .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid rgba(255,255,255,.055)}
-    .row:first-of-type{border-top:0}
-    .label{color:var(--muted);font-size:13px}.value{font-weight:800;text-align:right}
-    .ok{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-    .pill{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;background:var(--chip);font-size:12px;font-weight:800}
-    .dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--muted)}
-    .dot.good{background:var(--good)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
-    table{width:100%;border-collapse:collapse;font-size:12px}
-    th,td{padding:9px 7px;border-bottom:1px solid rgba(255,255,255,.07);text-align:left}
-    th{color:#aeb9d5;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
-    tr.clickable:hover{background:rgba(255,255,255,.035)}
-    .strat{font-weight:900;display:inline-block;min-width:26px;text-align:center}
-    .s1{color:var(--yellow)}.s2u{color:var(--good)}.s2d{color:var(--bad)}.s3{color:var(--purple)}
-    .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-    .btn{border:1px solid var(--line);background:#1a2544;color:#eef2ff;border-radius:10px;padding:8px 10px;font-weight:800}
-    .btn.secondary{background:transparent;color:#b7c1dc}
-    select,input{background:#111a37;color:white;border:1px solid var(--line);border-radius:10px;padding:8px}
-    textarea{
-      width:100%;min-height:250px;background:#070c20;color:#dce5ff;border:1px solid var(--line);
-      border-radius:12px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.45
-    }
-    .small{font-size:11px;color:var(--muted)}
-    .event{display:grid;grid-template-columns:78px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.055);font-size:12px}
-    .time{color:#8694b6;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-    .banner{border:1px dashed #705b2b;background:#1f1a10;color:#f0ce7b;padding:10px 12px;border-radius:12px;font-size:12px;margin-bottom:12px}
-    .kpi{font-size:28px;font-weight:900;line-height:1}.kpiLabel{font-size:11px;color:var(--muted);margin-top:5px}
-    .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-    @media(min-width:760px){.kpis{grid-template-columns:repeat(4,1fr)}}
-    .kpiBox{background:#0b122c;border:1px solid var(--line);border-radius:12px;padding:12px}
-    .checkrow{display:flex;align-items:center;gap:8px;padding:6px 0;color:#d8e1f7;font-size:13px}
-    .mutedBox{padding:12px;background:#0a1129;border:1px solid var(--line);border-radius:12px;color:#b7c3df;font-size:12px;line-height:1.55}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1026">
+<title>Trading Research Console v0.2</title>
+<style>
+:root{--bg:#090f2b;--panel:#111936;--panel2:#0e1530;--text:#eef2ff;--muted:#9aa6c3;--line:#263251;--good:#5fbf86;--warn:#d7a84a;--bad:#d86c6c;--purple:#a882e8;--yellow:#e0c75a;--chip:#17213f;--shadow:0 12px 30px rgba(0,0,0,.22)}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(180deg,#080d24,#0a112c 35%,#090f2b);color:var(--text);min-height:100vh}
+button,select,textarea,input{font:inherit} button{cursor:pointer}
+.app{max-width:1180px;margin:0 auto;padding:18px 14px 88px}
+.topbar{position:sticky;top:0;z-index:20;margin:-18px -14px 16px;padding:calc(12px + env(safe-area-inset-top)) 14px 12px;background:rgba(9,15,43,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+.toprow{display:flex;align-items:center;gap:12px;justify-content:space-between;max-width:1180px;margin:0 auto}
+h1{font-size:18px;margin:0;font-weight:800}.subtitle{color:var(--muted);font-size:12px;margin-top:3px}
+.badge{padding:6px 9px;border-radius:999px;background:#2a1f17;color:#ffd790;border:1px solid #62451e;font-size:11px;font-weight:800}
+.tabs{display:flex;gap:8px;overflow:auto;padding:2px 0 4px;margin:0 0 16px}
+.tab{border:1px solid var(--line);background:var(--chip);color:var(--muted);border-radius:10px;padding:9px 12px;font-weight:700;white-space:nowrap}
+.tab.active{background:#1e2a4d;color:white;border-color:#43557e}
+.view{display:none}.view.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+.card{grid-column:span 12;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+@media(min-width:760px){.half{grid-column:span 6}.third{grid-column:span 4}.twoThird{grid-column:span 8}}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.11em;color:#b8c4e2;margin:0 0 12px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid rgba(255,255,255,.055)}.row:first-of-type{border-top:0}
+.label{color:var(--muted);font-size:13px}.value{font-weight:800;text-align:right}.ok{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:12px} th,td{padding:9px 7px;border-bottom:1px solid rgba(255,255,255,.07);text-align:left} th{color:#aeb9d5;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.strat{font-weight:900}.s1{color:var(--yellow)}.s2u{color:var(--good)}.s2d{color:var(--bad)}.s3{color:var(--purple)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.btn{border:1px solid var(--line);background:#1a2544;color:#eef2ff;border-radius:10px;padding:8px 10px;font-weight:800}.btn.secondary{background:transparent;color:#b7c1dc}
+select,input{background:#111a37;color:white;border:1px solid var(--line);border-radius:10px;padding:8px}
+textarea{width:100%;min-height:260px;background:#070c20;color:#dce5ff;border:1px solid var(--line);border-radius:12px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.45}
+.small{font-size:11px;color:var(--muted)}.event{display:grid;grid-template-columns:78px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.055);font-size:12px}.time{color:#8694b6;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.banner{border:1px dashed #705b2b;background:#1f1a10;color:#f0ce7b;padding:10px 12px;border-radius:12px;font-size:12px;margin-bottom:12px}
+.mutedBox{padding:12px;background:#0a1129;border:1px solid var(--line);border-radius:12px;color:#b7c3df;font-size:12px;line-height:1.55}
+.checkrow{display:flex;align-items:center;gap:8px;padding:6px 0;color:#d8e1f7;font-size:13px}
+</style>
 </head>
 <body>
 <div class="app">
-  <header class="topbar">
-    <div class="toprow">
-      <div>
-        <h1>Trading Research Console <span style="color:#8292b9">v0.1</span></h1>
-        <div class="subtitle">Deterministic engine monitor • sample-data mode</div>
-      </div>
-      <div class="badge">SAMPLE DATA</div>
-    </div>
-  </header>
+<header class="topbar"><div class="toprow"><div><h1>Trading Research Console <span style="color:#8292b9">v0.2</span></h1><div class="subtitle">Deterministic engine monitor • corrected path semantics • sample-data mode</div></div><div class="badge">SAMPLE DATA</div></div></header>
 
-  <nav class="tabs" aria-label="Console sections">
-    <button class="tab active" data-view="monitor">Monitor</button>
-    <button class="tab" data-view="candidates">Candidates</button>
-    <button class="tab" data-view="history">History</button>
-    <button class="tab" data-view="research">Research</button>
-    <button class="tab" data-view="settings">Settings</button>
-  </nav>
+<nav class="tabs" aria-label="Console sections">
+<button class="tab active" data-view="monitor">Monitor</button>
+<button class="tab" data-view="candidates">Candidates</button>
+<button class="tab" data-view="history">History</button>
+<button class="tab" data-view="research">Research</button>
+<button class="tab" data-view="settings">Settings</button>
+</nav>
 
-  <section id="monitor" class="view active">
-    <div class="banner">This build intentionally uses embedded sample OHLC data. No market feed is connected yet, and nothing on this page is a live trading signal.</div>
-    <div class="grid">
-      <div class="card half">
-        <h2>Data / Engine Status</h2>
-        <div class="row"><span class="label">Provider</span><span class="value">Embedded sample</span></div>
-        <div class="row"><span class="label">Feed status</span><span class="value ok">READY</span></div>
-        <div class="row"><span class="label">Scenario</span><span class="value" id="scenarioLabel">STANDARD STRAT</span></div>
-        <div class="row"><span class="label">Active symbol</span><span class="value" id="symbolLabel">DEMO</span></div>
-        <div class="row"><span class="label">Bars loaded</span><span class="value" id="barsLoaded">0</span></div>
-      </div>
-
-      <div class="card half">
-        <h2>Timeframe Continuity</h2>
-        <div id="tfRows"></div>
-        <div class="row"><span class="label">FTFC</span><span class="value" id="ftfcValue">—</span></div>
-      </div>
-
-      <div class="card twoThird">
-        <h2>Strat Engine</h2>
-        <div class="row"><span class="label">Detected setup</span><span class="value" id="setupValue">—</span></div>
-        <div class="row"><span class="label">Trigger</span><span class="value" id="triggerValue">—</span></div>
-        <div class="row"><span class="label">In force</span><span class="value" id="inForceValue">—</span></div>
-        <div class="row"><span class="label">T1 / initial magnitude</span><span class="value" id="targetValue">—</span></div>
-        <div class="row"><span class="label">50% stop</span><span class="value" id="stop50Value">—</span></div>
-        <div class="row"><span class="label">Structure stop</span><span class="value" id="stopStructureValue">—</span></div>
-        <div class="row"><span class="label">R:R to T1</span><span class="value" id="rrValue">—</span></div>
-      </div>
-
-      <div class="card third">
-        <h2>Exhaustion</h2>
-        <div class="row"><span class="label">Price</span><span class="value" id="priceExhaustion">—</span></div>
-        <div class="row"><span class="label">Time</span><span class="value" id="timeExhaustion">—</span></div>
-        <div class="row"><span class="label">Candle progress</span><span class="value" id="timePct">—</span></div>
-      </div>
-
-      <div class="card half">
-        <h2>Raw Candle Inspector</h2>
-        <div id="candleInspector"></div>
-      </div>
-
-      <div class="card half">
-        <h2>Event Log</h2>
-        <div id="eventLog"></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="candidates" class="view">
-    <div class="grid">
-      <div class="card">
-        <h2>Candidate Ranking — Demo</h2>
-        <div class="toolbar">
-          <select id="directionFilter">
-            <option value="ALL">All directions</option>
-            <option value="BULLISH">Bullish</option>
-            <option value="BEARISH">Bearish</option>
-          </select>
-          <select id="priceFilter">
-            <option value="ALL">All price buckets</option>
-            <option value="LOW">Low price</option>
-            <option value="MID">Mid price</option>
-            <option value="HIGH">High price</option>
-          </select>
-        </div>
-        <div style="overflow:auto">
-          <table>
-            <thead><tr><th>Rank</th><th>Ticker</th><th>Dir</th><th>Price</th><th>Bucket</th><th>Strat</th><th>FTFC</th><th>R:R</th><th>Guard</th></tr></thead>
-            <tbody id="candidateBody"></tbody>
-          </table>
-        </div>
-        <div class="small" style="margin-top:10px">Ranking values are demo placeholders. The production score will remain inspectable and evidence-based.</div>
-      </div>
-    </div>
-  </section>
-
-  <section id="history" class="view">
-    <div class="grid">
-      <div class="card">
-        <h2>Historical Event Store — Schema Preview</h2>
-        <div class="mutedBox">
-          Every qualifying event will be preserved, even when the UI narrows results to a Top 10 or Top 5. Planned fields include ticker, timestamp, setup, direction, timeframe set, trigger, stops, targets, FTFC, Minervini state, Elder state, exhaustion, guardrails, MFE, MAE, target/stop outcome, and time-to-target.
-        </div>
-        <div style="overflow:auto;margin-top:12px">
-          <table>
-            <thead><tr><th>Date</th><th>Ticker</th><th>Setup</th><th>Dir</th><th>FTFC</th><th>Outcome</th><th>R</th></tr></thead>
-            <tbody>
-              <tr><td>Sample</td><td>DEMO</td><td>2-1-2</td><td>Bullish</td><td>4/4</td><td>T1 hit</td><td>+2.4R</td></tr>
-              <tr><td>Sample</td><td>TEST</td><td>2-2</td><td>Bearish</td><td>3/4</td><td>Stopped</td><td>-1.0R</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="research" class="view">
-    <div class="grid">
-      <div class="card">
-        <h2>Research Console — Placeholder Metrics</h2>
-        <div class="kpis">
-          <div class="kpiBox"><div class="kpi">0</div><div class="kpiLabel">Real historical samples</div></div>
-          <div class="kpiBox"><div class="kpi">0</div><div class="kpiLabel">Validated setups</div></div>
-          <div class="kpiBox"><div class="kpi">0</div><div class="kpiLabel">Out-of-sample tests</div></div>
-          <div class="kpiBox"><div class="kpi">0</div><div class="kpiLabel">Live/paper observations</div></div>
-        </div>
-        <div class="mutedBox" style="margin-top:12px">
-          This tab is deliberately empty of performance claims until real historical data is connected and audited. Future comparisons will include setup type, FTFC alignment, price bucket, bullish/bearish direction, Minervini/Elder context, time exhaustion, and stop model.
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="settings" class="view">
-    <div class="grid">
-      <div class="card half">
-        <h2>Scenario Preset</h2>
-        <div class="row">
-          <span class="label">Preset</span>
-          <select id="scenarioSelect">
-            <option value="STANDARD">STANDARD STRAT</option>
-            <option value="INTRADAY">INTRADAY</option>
-            <option value="REVERSAL">REVERSAL HUNT</option>
-          </select>
-        </div>
-        <div class="small" style="margin:8px 0 4px">Presets may activate or filter valid rules. They do not redefine what a Strat rule means.</div>
-      </div>
-
-      <div class="card half">
-        <h2>Advanced Rule Visibility</h2>
-        <label class="checkrow"><input type="checkbox" checked disabled> 1 / inside bars</label>
-        <label class="checkrow"><input type="checkbox" checked disabled> 2-2 reversals</label>
-        <label class="checkrow"><input type="checkbox" checked disabled> 2-1-2 reversals</label>
-        <label class="checkrow"><input type="checkbox" checked disabled> 3-1-2</label>
-        <label class="checkrow"><input type="checkbox" checked disabled> failed-2 → 3</label>
-        <div class="small">Controls are visible but locked in v0.1. They become configurable only after the deterministic rules are validated.</div>
-      </div>
-
-      <div class="card">
-        <h2>Sample OHLC Input</h2>
-        <div class="toolbar">
-          <button class="btn" id="runButton">Run engine</button>
-          <button class="btn secondary" id="resetButton">Reset sample</button>
-        </div>
-        <textarea id="jsonInput" spellcheck="false"></textarea>
-        <div id="inputMessage" class="small" style="margin-top:8px"></div>
-      </div>
-    </div>
-  </section>
+<section id="monitor" class="view active">
+<div class="banner">Embedded sample OHLC only. No market feed is connected. A completed Scenario 3 is directionally ambiguous unless lower-timeframe/tick path evidence is supplied.</div>
+<div class="grid">
+<div class="card half"><h2>Data / Engine Status</h2>
+<div class="row"><span class="label">Provider</span><span class="value">Embedded sample</span></div>
+<div class="row"><span class="label">Engine</span><span class="value ok">core-engine-v0.3</span></div>
+<div class="row"><span class="label">Scenario</span><span class="value" id="scenarioLabel">STANDARD STRAT</span></div>
+<div class="row"><span class="label">Active symbol</span><span class="value" id="symbolLabel">DEMO</span></div>
+<div class="row"><span class="label">Bars loaded</span><span class="value" id="barsLoaded">0</span></div>
 </div>
 
+<div class="card half"><h2>Timeframe Continuity</h2><div id="tfRows"></div><div class="row"><span class="label">FTFC</span><span class="value" id="ftfcValue">—</span></div></div>
+
+<div class="card twoThird"><h2>Strat Engine</h2>
+<div class="row"><span class="label">Detected setup</span><span class="value" id="setupValue">—</span></div>
+<div class="row"><span class="label">Path status</span><span class="value" id="pathValue">—</span></div>
+<div class="row"><span class="label">Trigger</span><span class="value" id="triggerValue">—</span></div>
+<div class="row"><span class="label">In force</span><span class="value" id="inForceValue">—</span></div>
+<div class="row"><span class="label">Magnitude</span><span class="value" id="magnitudeValue">—</span></div>
+<div class="row"><span class="label">Midpoint Stop</span><span class="value" id="midpointStopValue">—</span></div>
+<div class="row"><span class="label">Structure stop</span><span class="value" id="structureStopValue">—</span></div>
+<div class="row"><span class="label">R:R to magnitude</span><span class="value" id="rrValue">—</span></div>
+</div>
+
+<div class="card third"><h2>Exhaustion</h2>
+<div class="row"><span class="label">Magnitude status</span><span class="value" id="priceExhaustion">—</span></div>
+<div class="row"><span class="label">Time</span><span class="value" id="timeExhaustion">—</span></div>
+<div class="row"><span class="label">Candle progress</span><span class="value" id="timePct">—</span></div>
+</div>
+
+<div class="card half"><h2>Raw Candle Inspector</h2><div id="candleInspector"></div></div>
+<div class="card half"><h2>Event Log</h2><div id="eventLog"></div></div>
+</div>
+</section>
+
+<section id="candidates" class="view"><div class="grid"><div class="card">
+<h2>Candidate Ranking — Demo</h2>
+<div class="toolbar"><select id="directionFilter"><option value="ALL">All directions</option><option value="BULLISH">Bullish</option><option value="BEARISH">Bearish</option></select><select id="priceFilter"><option value="ALL">All price buckets</option><option value="LOW">Low price</option><option value="MID">Mid price</option><option value="HIGH">High price</option></select></div>
+<div style="overflow:auto"><table><thead><tr><th>Rank</th><th>Ticker</th><th>Dir</th><th>Price</th><th>Bucket</th><th>Strat</th><th>FTFC</th><th>R:R</th><th>Guard</th></tr></thead><tbody id="candidateBody"></tbody></table></div>
+<div class="small" style="margin-top:10px">Demo ranking only. Production ranking remains inspectable and evidence-based.</div>
+</div></div></section>
+
+<section id="history" class="view"><div class="grid"><div class="card"><h2>Historical Event Store — Schema Preview</h2>
+<div class="mutedBox">Every qualifying event will be preserved. Planned fields include ticker, timestamp, setup, direction, timeframe set, trigger, midpoint/structure stops, magnitude, targets, FTFC, Minervini state, Elder state, exhaustion, guardrails, MFE, MAE, outcome, path-resolution source, and time-to-magnitude.</div>
+</div></div></section>
+
+<section id="research" class="view"><div class="grid"><div class="card"><h2>Research Console</h2>
+<div class="mutedBox">No performance claims are shown until real historical data is connected and audited. Current work is deterministic rule validation, real-chart setup/magnitude validation, and path-resolution testing.</div>
+</div></div></section>
+
+<section id="settings" class="view"><div class="grid">
+<div class="card half"><h2>Scenario Preset</h2><div class="row"><span class="label">Preset</span><select id="scenarioSelect"><option value="STANDARD">STANDARD STRAT</option><option value="INTRADAY">INTRADAY</option><option value="REVERSAL">REVERSAL HUNT</option></select></div><div class="small" style="margin-top:8px">Presets filter valid rules; they do not redefine them.</div></div>
+<div class="card half"><h2>Path Evidence</h2>
+<div class="row"><span class="label">Current Scenario-3 path</span><select id="pathSelect"><option value="">Unknown / none</option><option value="BULLISH">BULLISH: broke low first, then high</option><option value="BEARISH">BEARISH: broke high first, then low</option></select></div>
+<div class="small" style="margin-top:8px">Use only when lower-timeframe or tick evidence establishes sequence. Do not infer path from completed OHLC.</div>
+</div>
+<div class="card half"><h2>Advanced Rule Visibility</h2>
+<label class="checkrow"><input type="checkbox" checked disabled> 1 / inside bars</label>
+<label class="checkrow"><input type="checkbox" checked disabled> 2-2 reversals</label>
+<label class="checkrow"><input type="checkbox" checked disabled> 2-1-2 reversals</label>
+<label class="checkrow"><input type="checkbox" checked disabled> 3-1-2</label>
+<label class="checkrow"><input type="checkbox" checked disabled> failed-2 → 3 with path evidence</label>
+</div>
+<div class="card"><h2>Sample OHLC Input</h2><div class="toolbar"><button class="btn" id="runButton">Run engine</button><button class="btn secondary" id="resetButton">Reset sample</button></div><textarea id="jsonInput" spellcheck="false"></textarea><div id="inputMessage" class="small" style="margin-top:8px"></div></div>
+</div></section>
+</div>
+
+<script src="core-engine-v0.3.js"></script>
 <script>
 "use strict";
-
-/* =========================
-   LOCKED DETERMINISTIC RULES
-   ========================= */
-
-function classifyBar(current, prior){
-  const H=current.high, L=current.low, PH=prior.high, PL=prior.low;
-  if(H <= PH && L >= PL) return "1";
-  if(H > PH && L >= PL) return "2U";
-  if(L < PL && H <= PH) return "2D";
-  if(H > PH && L < PL) return "3";
-  return "?";
-}
-
-function candleColor(bar){
-  if(bar.close > bar.open) return "GREEN";
-  if(bar.close < bar.open) return "RED";
-  return "DOJI";
-}
-
-function timeframeState(price, open){
-  if(price > open) return "BULLISH";
-  if(price < open) return "BEARISH";
-  return "NEUTRAL";
-}
-
-function calcFTFC(timeframes){
-  let bull=0,bear=0,neutral=0;
-  timeframes.forEach(tf=>{
-    const s=timeframeState(tf.price, tf.open);
-    if(s==="BULLISH") bull++;
-    else if(s==="BEARISH") bear++;
-    else neutral++;
-  });
-  const total=timeframes.length;
-  const dir=bull>bear?"BULLISH":bear>bull?"BEARISH":"MIXED";
-  const aligned=Math.max(bull,bear);
-  return {bull,bear,neutral,total,dir,aligned,label:`${aligned}/${total} ${dir}`};
-}
-
-function detectSetup(bars){
-  if(bars.length < 3) return {name:"NONE",direction:"NONE"};
-  const a=bars[bars.length-3], b=bars[bars.length-2], c=bars[bars.length-1];
-  const at=classifyBar(a,bars[bars.length-4] || a);
-  const bt=classifyBar(b,a);
-  const ct=classifyBar(c,b);
-
-  // 2-1-2 reversal
-  if(at==="2D" && bt==="1" && (ct==="2U" || ct==="3")){
-    return {name:"2-1-2",direction:"BULLISH",trigger:b.high,target:a.high,reference:b};
-  }
-  if(at==="2U" && bt==="1" && (ct==="2D" || ct==="3")){
-    return {name:"2-1-2",direction:"BEARISH",trigger:b.low,target:a.low,reference:b};
-  }
-
-  // 3-1-2
-  if(at==="3" && bt==="1" && ct==="2U"){
-    return {name:"3-1-2",direction:"BULLISH",trigger:b.high,target:a.high,reference:b};
-  }
-  if(at==="3" && bt==="1" && ct==="2D"){
-    return {name:"3-1-2",direction:"BEARISH",trigger:b.low,target:a.low,reference:b};
-  }
-
-  // 2-2 reversal
-  if(bt==="2D" && (ct==="2U" || ct==="3")){
-    return {name:"2-2",direction:"BULLISH",trigger:b.high,target:a.high,reference:b};
-  }
-  if(bt==="2U" && (ct==="2D" || ct==="3")){
-    return {name:"2-2",direction:"BEARISH",trigger:b.low,target:a.low,reference:b};
-  }
-
-  // Pending inside-bar break
-  if(bt==="1"){
-    return {name:"INSIDE BREAK PENDING",direction:"BOTH",triggerUp:b.high,triggerDown:b.low,reference:b};
-  }
-
-  return {name:"NONE",direction:"NONE"};
-}
-
-function calculateTrade(setup,currentPrice){
-  if(!setup || !["BULLISH","BEARISH"].includes(setup.direction)) return null;
-  const r=setup.reference;
-  const midpoint=(r.high+r.low)/2;
-  const inForce=setup.direction==="BULLISH" ? currentPrice>setup.trigger : currentPrice<setup.trigger;
-  const structureStop=setup.direction==="BULLISH" ? r.low : r.high;
-  const entry=setup.trigger;
-  const risk=setup.direction==="BULLISH" ? entry-midpoint : midpoint-entry;
-  const reward=setup.direction==="BULLISH" ? setup.target-entry : entry-setup.target;
-  const rr=(risk>0 && reward>0)?reward/risk:null;
-  const targetHit=setup.direction==="BULLISH" ? currentPrice>=setup.target : currentPrice<=setup.target;
-  return {midpoint,structureStop,inForce,entry,risk,reward,rr,targetHit};
-}
-
-function timeExhaustion(progressPct){
-  const p=Math.max(0,Math.min(100,Number(progressPct)||0));
-  if(p<50) return "LOW";
-  if(p<=80) return "MEDIUM";
-  return "HIGH";
-}
-
-/* =========================
-   SAMPLE DATA
-   ========================= */
-
-const SAMPLE = {
-  symbol:"DEMO",
-  scenario:"STANDARD",
-  candleProgressPct:42,
-  timeframes:[
-    {name:"MONTH",open:48.10,price:52.65},
-    {name:"WEEK",open:50.90,price:52.65},
-    {name:"DAY",open:51.60,price:52.65},
-    {name:"60m",open:52.10,price:52.65}
-  ],
-  bars:[
-    {time:"T-4",open:50.20,high:51.30,low:49.70,close:51.10},
-    {time:"T-3",open:51.05,high:51.45,low:49.95,close:50.10},
-    {time:"T-2",open:50.15,high:50.95,low:49.80,close:50.70},
-    {time:"T-1",open:50.65,high:50.90,low:50.10,close:50.55},
-    {time:"LIVE",open:50.60,high:52.80,low:50.35,close:52.65}
-  ]
-};
-
-let state=JSON.parse(JSON.stringify(SAMPLE));
-
-const $=s=>document.querySelector(s);
-const $$=s=>Array.from(document.querySelectorAll(s));
-const fmt=n=>Number.isFinite(n)?`$${n.toFixed(2)}`:"—";
-
-function render(){
-  $("#symbolLabel").textContent=state.symbol || "—";
-  $("#scenarioLabel").textContent=scenarioName(state.scenario);
-  $("#barsLoaded").textContent=state.bars?.length || 0;
-
-  const tfHTML=(state.timeframes||[]).map(tf=>{
-    const s=timeframeState(tf.price,tf.open);
-    return `<div class="row"><span class="label">${escapeHTML(tf.name)}</span><span class="value ${s==="BULLISH"?"ok":s==="BEARISH"?"bad":"warn"}">${s}</span></div>`;
-  }).join("");
-  $("#tfRows").innerHTML=tfHTML;
-  const ftfc=calcFTFC(state.timeframes||[]);
-  $("#ftfcValue").textContent=ftfc.label;
-  $("#ftfcValue").className="value "+(ftfc.dir==="BULLISH"?"ok":ftfc.dir==="BEARISH"?"bad":"warn");
-
-  const setup=detectSetup(state.bars||[]);
-  const current=(state.bars||[]).at(-1);
-  const trade=current?calculateTrade(setup,current.close):null;
-
-  $("#setupValue").textContent=setup.name==="NONE"?"NONE":`${setup.name} ${setup.direction}`;
-  $("#setupValue").className="value "+(setup.direction==="BULLISH"?"ok":setup.direction==="BEARISH"?"bad":"");
-  $("#triggerValue").textContent=setup.trigger?fmt(setup.trigger):(setup.triggerUp?`${fmt(setup.triggerUp)} up / ${fmt(setup.triggerDown)} down`:"—");
-  $("#inForceValue").textContent=trade?(trade.inForce?"YES":"NO"):"—";
-  $("#inForceValue").className="value "+(trade?(trade.inForce?"ok":"warn"):"");
-  $("#targetValue").textContent=setup.target?fmt(setup.target):"—";
-  $("#stop50Value").textContent=trade?fmt(trade.midpoint):"—";
-  $("#stopStructureValue").textContent=trade?fmt(trade.structureStop):"—";
-  $("#rrValue").textContent=trade&&trade.rr?`${trade.rr.toFixed(2)}R`:"—";
-
-  $("#priceExhaustion").textContent=trade?(trade.targetHit?"ACTIVE":"LOW"):"—";
-  $("#priceExhaustion").className="value "+(trade&&trade.targetHit?"warn":"ok");
-  const te=timeExhaustion(state.candleProgressPct);
-  $("#timeExhaustion").textContent=te;
-  $("#timeExhaustion").className="value "+(te==="LOW"?"ok":te==="MEDIUM"?"warn":"bad");
-  $("#timePct").textContent=`${Number(state.candleProgressPct||0).toFixed(0)}%`;
-
-  renderInspector();
-  renderEvents(setup,ftfc,trade);
-  renderCandidates();
-}
-
-function renderInspector(){
-  const bars=state.bars||[];
-  if(bars.length<2){$("#candleInspector").innerHTML='<div class="small">Need at least two bars.</div>';return;}
-  const c=bars.at(-1), p=bars.at(-2), cls=classifyBar(c,p), col=candleColor(c);
-  $("#candleInspector").innerHTML=`
-    <div class="row"><span class="label">Time</span><span class="value">${escapeHTML(c.time||"LIVE")}</span></div>
-    <div class="row"><span class="label">Open</span><span class="value">${fmt(c.open)}</span></div>
-    <div class="row"><span class="label">High</span><span class="value">${fmt(c.high)}</span></div>
-    <div class="row"><span class="label">Low</span><span class="value">${fmt(c.low)}</span></div>
-    <div class="row"><span class="label">Close</span><span class="value">${fmt(c.close)}</span></div>
-    <div class="row"><span class="label">Prior high / low</span><span class="value">${fmt(p.high)} / ${fmt(p.low)}</span></div>
-    <div class="row"><span class="label">Classification</span><span class="value strat ${classForStrat(cls)}">${cls}</span></div>
-    <div class="row"><span class="label">Candle body</span><span class="value">${col}</span></div>`;
-}
-
-function renderEvents(setup,ftfc,trade){
-  const now=["17:30:00","17:30:01","17:30:02","17:30:03"];
-  const current=(state.bars||[]).at(-1);
-  const prev=(state.bars||[]).at(-2);
-  const cls=current&&prev?classifyBar(current,prev):"—";
-  const items=[
-    `Latest bar classified ${cls}`,
-    `FTFC evaluated ${ftfc.label}`,
-    setup.name!=="NONE"?`Setup detected: ${setup.name} ${setup.direction}`:"No actionable setup detected",
-    trade?`Setup is ${trade.inForce?"IN FORCE":"OUT OF FORCE"}`:"Trade-state calculation unavailable"
-  ];
-  $("#eventLog").innerHTML=items.map((t,i)=>`<div class="event"><div class="time">${now[i]}</div><div>${escapeHTML(t)}</div></div>`).join("");
-}
-
-const CANDIDATES=[
-  {rank:1,ticker:"DEMO",dir:"BULLISH",price:18.40,bucket:"LOW",strat:"2-1-2",ftfc:"4/4",rr:4.2,guard:"READY"},
-  {rank:2,ticker:"TEST",dir:"BEARISH",price:63.20,bucket:"MID",strat:"2-2",ftfc:"4/4",rr:3.8,guard:"READY"},
-  {rank:3,ticker:"MOCK",dir:"BULLISH",price:142.10,bucket:"HIGH",strat:"3-1-2",ftfc:"3/4",rr:3.1,guard:"WATCH"},
-  {rank:4,ticker:"LAB",dir:"BEARISH",price:24.75,bucket:"LOW",strat:"2-2",ftfc:"3/4",rr:2.9,guard:"WATCH"},
-  {rank:5,ticker:"SIM",dir:"BULLISH",price:78.55,bucket:"MID",strat:"2-1-2",ftfc:"4/4",rr:2.7,guard:"READY"}
-];
-
-function renderCandidates(){
-  const d=$("#directionFilter")?.value||"ALL";
-  const p=$("#priceFilter")?.value||"ALL";
-  const rows=CANDIDATES.filter(x=>(d==="ALL"||x.dir===d)&&(p==="ALL"||x.bucket===p));
-  $("#candidateBody").innerHTML=rows.map(x=>`
-    <tr class="clickable">
-      <td>${x.rank}</td><td><strong>${x.ticker}</strong></td>
-      <td class="${x.dir==="BULLISH"?"ok":"bad"}">${x.dir}</td>
-      <td>${fmt(x.price)}</td><td>${x.bucket}</td><td>${x.strat}</td>
-      <td>${x.ftfc}</td><td>${x.rr.toFixed(1)}R</td>
-      <td class="${x.guard==="READY"?"ok":"warn"}">${x.guard}</td>
-    </tr>`).join("");
-}
-
-function scenarioName(v){
-  return ({STANDARD:"STANDARD STRAT",INTRADAY:"INTRADAY",REVERSAL:"REVERSAL HUNT"})[v]||v||"STANDARD STRAT";
-}
-
+const SAMPLE={symbol:"DEMO",scenario:"STANDARD",currentBarPathDirection:null,candleProgressPct:42,timeframes:[{name:"MONTH",open:48.10,price:52.65},{name:"WEEK",open:50.90,price:52.65},{name:"DAY",open:51.60,price:52.65},{name:"60m",open:52.10,price:52.65}],bars:[{time:"T-4",open:50.20,high:51.30,low:49.70,close:51.10},{time:"T-3",open:51.05,high:51.45,low:49.95,close:50.10},{time:"T-2",open:50.15,high:50.95,low:49.80,close:50.70},{time:"T-1",open:50.65,high:50.90,low:50.10,close:50.55},{time:"LIVE",open:50.60,high:52.80,low:50.35,close:52.65}]};
+let state=structuredClone(SAMPLE);
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const fmt=n=>Number.isFinite(Number(n))?`$${Number(n).toFixed(2)}`:"—";
+function scenarioName(v){return ({STANDARD:"STANDARD STRAT",INTRADAY:"INTRADAY",REVERSAL:"REVERSAL HUNT"})[v]||v||"STANDARD STRAT"}
 function classForStrat(v){return v==="1"?"s1":v==="2U"?"s2u":v==="2D"?"s2d":v==="3"?"s3":""}
 function escapeHTML(v){return String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
-$$(".tab").forEach(btn=>btn.addEventListener("click",()=>{
-  $$(".tab").forEach(x=>x.classList.remove("active"));
-  $$(".view").forEach(x=>x.classList.remove("active"));
-  btn.classList.add("active");
-  $("#"+btn.dataset.view).classList.add("active");
-}));
+function render(){
+  $("#symbolLabel").textContent=state.symbol||"—"; $("#scenarioLabel").textContent=scenarioName(state.scenario); $("#barsLoaded").textContent=state.bars?.length||0;
+  $("#tfRows").innerHTML=(state.timeframes||[]).map(tf=>{const s=timeframeState(tf.price,tf.open);return `<div class="row"><span class="label">${escapeHTML(tf.name)}</span><span class="value ${s==="BULLISH"?"ok":s==="BEARISH"?"bad":"warn"}">${s}</span></div>`}).join("");
+  const ftfc=calcFTFC(state.timeframes||[]); $("#ftfcValue").textContent=ftfc.label; $("#ftfcValue").className="value "+(ftfc.dir==="BULLISH"?"ok":ftfc.dir==="BEARISH"?"bad":"warn");
 
-$("#directionFilter").addEventListener("change",renderCandidates);
-$("#priceFilter").addEventListener("change",renderCandidates);
-$("#scenarioSelect").addEventListener("change",e=>{
-  state.scenario=e.target.value;
-  $("#scenarioLabel").textContent=scenarioName(state.scenario);
-});
+  const setup=detectSetup(state.bars||[],{currentBarPathDirection:state.currentBarPathDirection||undefined});
+  const current=(state.bars||[]).at(-1); const trade=current?calculateTrade(setup,current.close):null;
+  $("#setupValue").textContent=setup.name==="NONE"?"NONE":`${setup.name} ${setup.direction}`; $("#setupValue").className="value "+(setup.direction==="BULLISH"?"ok":setup.direction==="BEARISH"?"bad":setup.direction==="UNKNOWN"?"warn":"");
+  $("#pathValue").textContent=setup.pathResolved===false?"AMBIGUOUS — NEED PATH DATA":setup.currentType==="3"?"RESOLVED FROM PATH DATA":"NOT REQUIRED"; $("#pathValue").className="value "+(setup.pathResolved===false?"warn":"ok");
+  $("#triggerValue").textContent=setup.trigger!=null?fmt(setup.trigger):(setup.triggerUp!=null?`${fmt(setup.triggerUp)} up / ${fmt(setup.triggerDown)} down`:"—");
+  $("#inForceValue").textContent=trade?(trade.inForce?"YES":"NO"):"—"; $("#inForceValue").className="value "+(trade?(trade.inForce?"ok":"warn"):"");
+  $("#magnitudeValue").textContent=setup.magnitude!=null?fmt(setup.magnitude):"—";
+  $("#midpointStopValue").textContent=trade?fmt(trade.midpointStop):"—"; $("#structureStopValue").textContent=trade?fmt(trade.structureStop):"—";
+  $("#rrValue").textContent=trade&&Number.isFinite(trade.rr)?`${trade.rr.toFixed(2)}R`:"—";
+  $("#priceExhaustion").textContent=trade?(trade.magnitudeHit?"MAGNITUDE HIT / EXHAUSTION CHECK":"MAGNITUDE OPEN"):"—"; $("#priceExhaustion").className="value "+(trade&&trade.magnitudeHit?"warn":"ok");
+  const te=timeExhaustion(state.candleProgressPct); $("#timeExhaustion").textContent=te; $("#timeExhaustion").className="value "+(te==="LOW"?"ok":te==="MEDIUM"?"warn":"bad"); $("#timePct").textContent=`${Number(state.candleProgressPct||0).toFixed(0)}%`;
+  renderInspector(); renderEvents(setup,ftfc,trade); renderCandidates();
+}
+function renderInspector(){
+  const bars=state.bars||[]; if(bars.length<2){$("#candleInspector").innerHTML='<div class="small">Need at least two bars.</div>';return}
+  const c=bars.at(-1),p=bars.at(-2),cls=classifyBar(c,p),col=candleColor(c);
+  $("#candleInspector").innerHTML=`<div class="row"><span class="label">Time</span><span class="value">${escapeHTML(c.time||"LIVE")}</span></div><div class="row"><span class="label">Open</span><span class="value">${fmt(c.open)}</span></div><div class="row"><span class="label">High</span><span class="value">${fmt(c.high)}</span></div><div class="row"><span class="label">Low</span><span class="value">${fmt(c.low)}</span></div><div class="row"><span class="label">Close / current mark</span><span class="value">${fmt(c.close)}</span></div><div class="row"><span class="label">Prior high / low</span><span class="value">${fmt(p.high)} / ${fmt(p.low)}</span></div><div class="row"><span class="label">Classification</span><span class="value strat ${classForStrat(cls)}">${cls}</span></div><div class="row"><span class="label">Candle body</span><span class="value">${col}</span></div>`;
+}
+function renderEvents(setup,ftfc,trade){
+  const current=(state.bars||[]).at(-1),prev=(state.bars||[]).at(-2),cls=current&&prev?classifyBar(current,prev):"—";
+  const items=[`Latest bar classified ${cls}`,`FTFC evaluated ${ftfc.label}`,setup.name!=="NONE"?`Setup state: ${setup.name} ${setup.direction}`:"No actionable setup detected",setup.pathResolved===false?"Outside bar path is ambiguous; directional reversal withheld":trade?`Setup is ${trade.inForce?"IN FORCE":"OUT OF FORCE"}`:"Trade-state calculation unavailable"];
+  $("#eventLog").innerHTML=items.map((t,i)=>`<div class="event"><div class="time">E${i+1}</div><div>${escapeHTML(t)}</div></div>`).join("");
+}
+const CANDIDATES=[{rank:1,ticker:"DEMO",dir:"BULLISH",price:18.40,bucket:"LOW",strat:"2-1-2",ftfc:"4/4",rr:4.2,guard:"READY"},{rank:2,ticker:"TEST",dir:"BEARISH",price:63.20,bucket:"MID",strat:"2-2",ftfc:"4/4",rr:3.8,guard:"READY"},{rank:3,ticker:"MOCK",dir:"BULLISH",price:142.10,bucket:"HIGH",strat:"3-1-2",ftfc:"3/4",rr:3.1,guard:"WATCH"}];
+function renderCandidates(){const d=$("#directionFilter")?.value||"ALL",p=$("#priceFilter")?.value||"ALL";const rows=CANDIDATES.filter(x=>(d==="ALL"||x.dir===d)&&(p==="ALL"||x.bucket===p));$("#candidateBody").innerHTML=rows.map(x=>`<tr><td>${x.rank}</td><td><strong>${x.ticker}</strong></td><td class="${x.dir==="BULLISH"?"ok":"bad"}">${x.dir}</td><td>${fmt(x.price)}</td><td>${x.bucket}</td><td>${x.strat}</td><td>${x.ftfc}</td><td>${x.rr.toFixed(1)}R</td><td class="${x.guard==="READY"?"ok":"warn"}">${x.guard}</td></tr>`).join("")}
 
-$("#runButton").addEventListener("click",()=>{
-  try{
-    const next=JSON.parse($("#jsonInput").value);
-    if(!Array.isArray(next.bars)||next.bars.length<2) throw new Error("bars must contain at least two OHLC records");
-    if(!Array.isArray(next.timeframes)||next.timeframes.length<1) throw new Error("timeframes must contain at least one item");
-    state=next;
-    $("#scenarioSelect").value=state.scenario||"STANDARD";
-    $("#inputMessage").textContent="Engine run complete.";
-    $("#inputMessage").className="small ok";
-    render();
-  }catch(err){
-    $("#inputMessage").textContent="Input error: "+err.message;
-    $("#inputMessage").className="small bad";
-  }
-});
-
-$("#resetButton").addEventListener("click",()=>{
-  state=JSON.parse(JSON.stringify(SAMPLE));
-  $("#jsonInput").value=JSON.stringify(state,null,2);
-  $("#scenarioSelect").value=state.scenario;
-  $("#inputMessage").textContent="Sample restored.";
-  $("#inputMessage").className="small";
-  render();
-});
-
-$("#jsonInput").value=JSON.stringify(state,null,2);
-render();
+$$(".tab").forEach(btn=>btn.addEventListener("click",()=>{$$(".tab").forEach(x=>x.classList.remove("active"));$$(".view").forEach(x=>x.classList.remove("active"));btn.classList.add("active");$("#"+btn.dataset.view).classList.add("active")}));
+$("#directionFilter").addEventListener("change",renderCandidates); $("#priceFilter").addEventListener("change",renderCandidates);
+$("#scenarioSelect").addEventListener("change",e=>{state.scenario=e.target.value;render()});
+$("#pathSelect").addEventListener("change",e=>{state.currentBarPathDirection=e.target.value||null;$("#jsonInput").value=JSON.stringify(state,null,2);render()});
+$("#runButton").addEventListener("click",()=>{try{const next=JSON.parse($("#jsonInput").value);if(!Array.isArray(next.bars)||next.bars.length<2)throw new Error("bars must contain at least two OHLC records");if(!Array.isArray(next.timeframes)||next.timeframes.length<1)throw new Error("timeframes must contain at least one item");state=next;$("#scenarioSelect").value=state.scenario||"STANDARD";$("#pathSelect").value=state.currentBarPathDirection||"";$("#inputMessage").textContent="Engine run complete.";$("#inputMessage").className="small ok";render()}catch(err){$("#inputMessage").textContent="Input error: "+err.message;$("#inputMessage").className="small bad"}});
+$("#resetButton").addEventListener("click",()=>{state=structuredClone(SAMPLE);$("#jsonInput").value=JSON.stringify(state,null,2);$("#scenarioSelect").value=state.scenario;$("#pathSelect").value="";$("#inputMessage").textContent="Sample restored.";$("#inputMessage").className="small";render()});
+$("#jsonInput").value=JSON.stringify(state,null,2); $("#scenarioSelect").value=state.scenario; $("#pathSelect").value=""; render();
 </script>
 </body>
 </html>
