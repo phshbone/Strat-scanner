@@ -13,7 +13,7 @@ function normalizeTarget(target,index=0){
     id:target.id || `target-${index+1}`,
     price:Number(target.price),
     timeframe:target.timeframe || null,
-    rangeId:target.rangeId || null
+    rangeId:target.rangeId || target.sourceRangeId || null
   };
 }
 
@@ -24,8 +24,8 @@ function sortTargets(targets,direction){
 
 /*
   Exact-price de-duplication is deterministic and does not require an invented
-  tolerance. If Daily/Weekly/Monthly structures all resolve to the exact same
-  boundary, treat that price as one objective while preserving every source.
+  tolerance. If multiple structural sources resolve to the exact same boundary,
+  treat that price as one objective while preserving every source.
 
   A merged level is considered consumed only when every source level is already
   marked consumed. This avoids silently erasing an active structural source.
@@ -51,7 +51,7 @@ function mergeExactPriceTargets(targets,direction){
       price:first.price,
       timeframe:first.timeframe,
       rangeId:first.rangeId,
-      source:first.source || "RANGE_BOUNDARY",
+      source:first.source || first.sourceType || "RANGE_BOUNDARY",
       structurallyRelevant:rows.some(r=>r.structurallyRelevant===true),
       eligibleTarget:rows.some(r=>r.eligibleTarget===true),
       consumed:rows.every(r=>r.consumed===true),
@@ -59,6 +59,8 @@ function mergeExactPriceTargets(targets,direction){
       supportingTargetIds:rows.map(r=>r.id),
       supportingTimeframes:Array.from(new Set(rows.map(r=>r.timeframe).filter(Boolean))),
       supportingRangeIds:Array.from(new Set(rows.map(r=>r.rangeId).filter(Boolean))),
+      supportingSources:Array.from(new Set(rows.map(r=>r.source || r.sourceType).filter(Boolean))),
+      supportingSourceTypes:Array.from(new Set(rows.map(r=>r.sourceType || r.source).filter(Boolean))),
       exactDuplicate:rows.length>1
     });
   }
@@ -112,8 +114,9 @@ function clusterNearbyTargets(targets,{direction,tolerance=0}={}){
 /*
   Price path determines objective order. A Weekly or Monthly target does not
   leapfrog a nearer Daily target merely because its timeframe is larger.
-  Higher-timeframe agreement is preserved as supporting evidence on merged
-  exact-price levels rather than used as an arbitrary priority override.
+  Higher-timeframe agreement and cross-source agreement are preserved as
+  supporting evidence on merged exact-price levels rather than used as an
+  arbitrary priority override.
 */
 function buildTargetHierarchy({targets=[],direction,proximityTolerance=0}={}){
   validateDirection(direction);
