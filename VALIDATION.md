@@ -1,4 +1,4 @@
-# Engine Validation — v0.28
+# Engine Validation — v0.29
 
 Date: 2026-08-19
 
@@ -23,12 +23,44 @@ Date: 2026-08-19
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Rob Smith FinTwit seminar — canonical reinforcement in v0.28
+## Rob Smith Tuesday Strat Attack — operational refinement in v0.29
 
 New direct-source research note:
-- `research/ROB-SMITH-FINTWIT-SEMINAR-CANONICAL-NOTES.md`
+- `research/ROB-SMITH-TUESDAY-STRAT-ATTACK-OPERATIONAL-NOTES.md`
 
-The user supplied a transcript of a Rob Smith FinTwit seminar. Because this is direct Rob Smith teaching, it has canonical authority over later execution refinements where a true rules conflict appears.
+This briefing is useful because it shows Rob applying the system in real time rather than defining it abstractly.
+
+High-value operational confirmations/refinements:
+- breadth / simultaneous-break logic is explicitly based on counting which weekly/daily ranges are being taken in each direction;
+- mixed directional participation can correspond to broader-index chop while aligned participation is stronger context;
+- inside-day / inside-range conditions remain unresolved until the relevant side breaks;
+- waiting for a real setup is explicitly part of the method — `WAIT / NO_ACTION` is a valid system outcome;
+- Rob may let the opening settle because gaps/early movement can create noise, but this is execution guidance rather than a universal signal-validity rule;
+- new year / quarter / month / week / day periods create new continuity reference opens and therefore require exact calendar/session boundary handling;
+- macro thesis and tactical execution remain separate lanes;
+- 60-minute signals can remain principal while 30-minute reversals supply tactical entries;
+- outside-range side tests, rejection, reclaim, and reversal should remain distinct structural states;
+- holiday / year-end participation context may matter as advisory metadata but should not imply direction.
+
+### New state/event candidates
+
+Future advisory/event layer may include:
+- `BREADTH_ALIGNED_BULLISH`
+- `BREADTH_ALIGNED_BEARISH`
+- `BREADTH_MIXED`
+- `INSIDE_RANGE_UNRESOLVED`
+- `WAIT_NO_ACTIONABLE_SETUP`
+- `PERIOD_OPEN_RESET`
+- `OPENING_NOISE_CONTEXT` (profile-configurable advisory only)
+- `RANGE_SIDE_REJECTED`
+- `RANGE_SIDE_RECLAIMED`
+
+No universal breadth threshold or mandatory opening delay has been encoded.
+
+## Rob Smith FinTwit seminar — canonical reinforcement
+
+Direct-source research note:
+- `research/ROB-SMITH-FINTWIT-SEMINAR-CANONICAL-NOTES.md`
 
 High-confidence canonical confirmations/refinements:
 - Scenario 1 / 2 / 3 definitions are exactly the current engine model;
@@ -46,43 +78,16 @@ High-confidence canonical confirmations/refinements:
 
 ### Critical data-semantics consequence
 
-Bar construction is now treated as a canonical implementation requirement, not a provider cosmetic detail.
-
 Intraday data must preserve:
 - market timezone;
 - session type;
 - regular vs extended-hours inclusion;
 - timeframe;
 - bar anchor / offset;
-- provider aggregation semantics.
+- provider aggregation semantics;
+- exact period-open identity for Y/Q/M/W/D/Intraday continuity resets.
 
 Historical validation must compare identical aggregation rules. A 60-minute Strat setup from one provider cannot be assumed equivalent to a differently anchored 60-minute series.
-
-### Simultaneous-break consequence
-
-Future scanner/ranking layer should calculate observable breadth across a defined sector/universe. Do not invent a universal percentage threshold before source verification and historical testing.
-
-### Hybrid-overlay safeguard reinforced
-
-Rob's direct teaching rejects indicators as necessary for pure Strat interpretation. The project therefore keeps strict source separation:
-- Strat = canonical setup/direction/magnitude/timeframe state;
-- Minervini = structural quality/ranking overlay;
-- Elder = trend/momentum/discipline overlay;
-- user plan = risk/behavioral guardrails.
-
-Those overlays may change trade desirability or management, but may not mutate pure Strat validity.
-
-## Jermaine / Benzinga purist baseline
-
-Research note:
-- `research/JERMAINE-BENZINGA-PURIST-BASELINE-NOTES.md`
-
-Important baseline observations remain:
-- three universal truths = actionable signals, timeframe continuity, broadening formations;
-- forming inside bars are unresolved/no-trade contexts until a valid break;
-- mother-bar confinement is chop context, not automatic setup invalidation;
-- M/W/D/60 is Jermaine's primary profile;
-- small initial size, tight stops, add-to-winners, re-entry, and loss-limit rules are execution/risk preferences rather than universal setup law.
 
 ## Carrier-relative interpretation engine
 
@@ -99,7 +104,7 @@ States include:
 - `MOTHER_BAR_CONFINED`
 - `RANGE_EXIT_CONFIRMING`
 
-The new Rob transcript further supports keeping ordinary lower-timeframe opposition distinct from actual higher-timeframe negation.
+Rob's direct daily briefing further supports keeping ordinary lower-timeframe opposition distinct from true higher-timeframe negation and allowing explicit unresolved/wait states.
 
 ## Strat Soldier Levels of Reclaim — current conceptual model
 
@@ -127,19 +132,24 @@ Reclaim path:
 
 `PRIOR RANGE / OUTSIDE BAR -> VERIFIED RECLAIM BOUNDARY -> RANGE RE-ENTRY STATE -> OPPOSITE RANGE OBJECTIVE -> MANAGEMENT / GUIDANCE`
 
-Data path requirement (expanded):
+Data path requirement:
 
-`OHLCV + SYMBOL + TIMEFRAME + MARKET TIMEZONE + SESSION + BAR ANCHOR/OFFSET + PROVIDER AGGREGATION`
+`OHLCV + SYMBOL + TIMEFRAME + MARKET TIMEZONE + SESSION + BAR ANCHOR/OFFSET + PROVIDER AGGREGATION + PERIOD OPEN IDENTITY`
+
+Breadth path requirement:
+
+`DEFINED UNIVERSE/SECTOR -> COUNT DIRECTIONAL 2s + FAILED-2->3 EVENTS -> ALIGNED/MIXED BREADTH CONTEXT -> RANKING/GUIDANCE`
 
 ## Next validation/build work
 
 1. implement a range-aware reclaim state/schema module;
-2. add explicit timeframe/session/bar-anchor metadata to the data model before broader intraday historical validation;
+2. add explicit timeframe/session/bar-anchor/period-open metadata to the data model before broader intraday historical validation;
 3. connect reclaim range completion into the objective/exhaustion layer;
 4. execute carrier-interpretation/schema/adapter harnesses in Node or CI and repair failures;
 5. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
-6. implement simultaneous-break breadth as a separate scanner/ranking evidence layer;
-7. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
-8. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
+6. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including an explicit mixed-breadth state;
+7. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome rather than forcing a trade suggestion;
+8. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
+9. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
 
 The Research Console remains in sample-data mode until real-market validation and data-semantics layers are materially complete.
