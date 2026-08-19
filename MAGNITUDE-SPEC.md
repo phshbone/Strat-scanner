@@ -1,4 +1,4 @@
-# Magnitude / Pivot Target Spec v0.4
+# Magnitude / Pivot Target Spec v0.5
 
 ## Authority
 Rob Smith is the canonical source for The Strat. Alex/Sarah material may operationalize or refine these rules, but when terminology or rule interpretation conflicts, Rob's observable price-action definitions take precedence.
@@ -48,6 +48,8 @@ Direction determines which side is relevant:
 - bullish path: prior highs above the active trigger/origin;
 - bearish path: prior lows below the active trigger/origin.
 
+A raw directional pivot is **not** automatically a valid post-magnitude target. It must be explicitly qualified by the active structure/range layer.
+
 ## Magnitude vs target terminology
 Use:
 - `magnitude` = the first setup/range-defined expected objective;
@@ -77,22 +79,25 @@ Do not project through an earlier larger range merely because additional pivots 
 
 The first magnitude is constrained by the setup/range that actually triggered. Additional broader pivots become targets only if the active structure supports continued travel into that larger prior range.
 
-## Deterministic target-stack behavior
-Given:
-- an origin/entry reference price,
-- direction (`BULLISH` or `BEARISH`),
-- setup-defined first magnitude,
-- a set of structurally relevant unconsumed pivots,
+## Deterministic objective state
+Production behavior is now explicit in `magnitude.js`.
 
-build the directional path:
-- bullish: relevant pivots strictly above origin, nearest first;
-- bearish: relevant pivots strictly below origin, nearest first.
+Inputs:
+- origin / trigger reference price;
+- direction;
+- setup-defined `magnitude`;
+- current price;
+- raw pivot candidates carrying structural-qualification state.
 
-The setup-defined first objective is `magnitude`. Any subsequent valid objectives are `targets`.
+State progression:
+1. before magnitude is reached, `nextObjective = MAGNITUDE`;
+2. raw directional pivots are not auto-promoted merely because they lie beyond magnitude;
+3. after magnitude is reached, only pivots marked structurally relevant / eligible by the upstream structure layer may become `TARGET` objectives;
+4. qualified targets are consumed as price reaches them and the next qualified target is promoted;
+5. once magnitude has been reached and no qualified targets remain, `exhaustionRisk = true`;
+6. exhaustion does not reverse direction by itself.
 
-As price reaches an objective, mark it consumed and promote the next remaining pivot.
-
-When the relevant active target structure has been cleared, mark `exhaustionRisk = true`.
+This prevents the previous implementation error where every directional pivot could be treated as part of the active objective stack.
 
 ## Exhaustion risk — canonical confirmation
 Rob explicitly describes exhaustion risk as occurring after price has moved into new highs/lows and has already cleared the prior participant group/range. At that point the move no longer benefits from the same stop-out/liquidity effect of moving back through a populated previous range; continued movement requires fresh directional aggression.
@@ -102,6 +107,10 @@ Therefore:
 - exhaustion is not an automatic reversal signal;
 - a fresh opposing Strat reversal is still required to justify a directional flip.
 
+Important edge:
+- if setup-defined magnitude is reached and no further pivot has been structurally qualified, the state is exhausted **for the currently known active structure**;
+- a later higher-timeframe/expanded range may qualify a new target, at which point the objective state can be rebuilt with that new structural evidence.
+
 ## Reversal-through-range behavior
 When one side of a prior/broadening range has been taken and a valid opposing Strat reversal occurs, opposite-side pivots become candidate objectives.
 
@@ -109,9 +118,10 @@ Example:
 1. a prior high is taken;
 2. bearish reversal becomes actionable/in force;
 3. relevant prior low/range side is magnitude;
-4. further lower unconsumed pivots are targets;
-5. taking those levels expands/clears the range;
-6. clearing the active structure creates exhaustion risk, not an automatic reversal signal.
+4. further lower unconsumed pivots are candidate targets;
+5. only structurally qualified candidates are promoted;
+6. taking those levels expands/clears the range;
+7. clearing the active structure creates exhaustion risk, not an automatic reversal signal.
 
 The bullish case is symmetrical.
 
@@ -199,12 +209,14 @@ A mathematically correct OHLC feed with the wrong session/anchor can generate di
 - 2-2 reversal first magnitude is the opposite side of the relevant prior range;
 - failed-2-to-3 direction is path dependent;
 - setup/range geometry limits first magnitude before broader targets are promoted;
-- clearing active magnitude/target structure creates exhaustion risk, not automatic reversal;
+- raw directional pivots are not automatically promoted after magnitude;
+- clearing setup magnitude plus the currently-qualified target structure creates exhaustion risk, not automatic reversal;
 - FTFC provides directional context but does not define magnitude;
 - simultaneous-break breadth belongs in scanner ranking/context;
 - session/aggregation anchors are required data semantics, not cosmetic chart settings.
 
 ## What is still not fully locked
+- exact upstream algorithm that marks a broader pivot structurally relevant across overlapping ranges/timeframes;
 - numeric PMG spacing/cluster threshold;
 - exact hierarchy when multiple timeframes provide competing candidate targets at similar prices;
 - whether any setup families beyond the explicitly sourced examples override setup-defined first magnitude;
@@ -234,5 +246,8 @@ Store at minimum:
 - exhaustion risk
 - session/aggregation anchor
 
+## Validation status
+`tests/magnitude-validation.js` now covers both the legacy raw directional-stack mechanics and the production objective-state behavior. The production tests verify explicit first magnitude, structural target filtering, target consumption/promotion, bullish/bearish symmetry, and post-magnitude exhaustion behavior.
+
 ## Status
-The broadening/magnitude relationship and first-magnitude behavior are now confirmed not only by Alex's operational teaching but directly by Rob Smith's canonical explanation. Remaining work is implementation validation, competing multi-timeframe target hierarchy, PMG ranking, and real-market replay.
+The broadening/magnitude relationship and first-magnitude behavior are confirmed by Rob Smith and operationally reinforced by Alex. The production engine now enforces the distinction between magnitude, raw pivots, qualified targets, and exhaustion. Remaining work is upstream structural qualification across overlapping/multi-timeframe ranges, competing target hierarchy, PMG ranking, and broader real-market replay.
