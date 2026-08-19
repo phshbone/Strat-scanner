@@ -1,4 +1,4 @@
-# Engine Validation — v0.22
+# Engine Validation — v0.23
 
 Date: 2026-08-19
 
@@ -14,72 +14,90 @@ Date: 2026-08-19
 - Integrated multi-timeframe objective pipeline: **20/20 PASS** in `tests/objective-pipeline-validation.js`.
 - Timeframe/domino state layer: **20/20 PASS** in `tests/timeframe-domino-validation.js`.
 - PMG geometry/actionable-state layer: **21/21 PASS** in `tests/pmg-validation.js`.
+- PMG -> production objective integration: **16/16 PASS locally** in `tests/pmg-objective-pipeline-validation.js`.
 - Actionable signal lifecycle layer: **25/25 PASS locally** in `tests/signal-lifecycle-validation.js`.
-- Normalized actionable-signal schema: focused harness added in `tests/signal-schema-validation.js`; execution was not re-run in the current tool session.
-- Core setup -> signal -> lifecycle -> domino adapter: focused harness added in `tests/setup-signal-adapter-validation.js`; execution was not re-run in the current tool session.
+- Normalized actionable-signal schema: focused harness exists in `tests/signal-schema-validation.js`; not re-run in this tool session.
+- Core setup -> signal -> lifecycle -> domino adapter: focused harness exists in `tests/setup-signal-adapter-validation.js`; not re-run in this tool session.
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Core setup -> signal -> domino integration — new in v0.22
+## PMG objective integration — new in v0.23
 
 New module:
-- `setup-signal-adapter.js`
+- `pmg-objective-pipeline.js`
 
 New focused harness:
-- `tests/setup-signal-adapter-validation.js`
+- `tests/pmg-objective-pipeline-validation.js`
 
 New spec:
-- `SETUP-SIGNAL-ADAPTER-SPEC.md`
+- `PMG-OBJECTIVE-PIPELINE-SPEC.md`
 
-This is the first bridge from actual setup objects emitted by `core-engine-v0.3.js` into the newer signal/lifecycle/domino architecture.
+Production chain:
 
-Production path is now materially connected as:
+`PMG GEOMETRY -> MATCHING STRAT REVERSAL IN FORCE -> SETUP MAGNITUDE -> PMG TARGET STACK -> OBJECTIVE STATE -> PRICE EXHAUSTION`
+
+Locked behavior:
+- PMG geometry alone is not actionable;
+- a matching reversal must already be in force;
+- setup-defined magnitude remains the first objective;
+- PMG levels beyond magnitude promote sequentially by actual price path;
+- bullish and bearish traversal are symmetric;
+- opposite-direction reversal does not activate the PMG target stack;
+- out-of-force reversal does not create an objective state;
+- no universal PMG spacing threshold is invented;
+- clearing magnitude plus the current PMG stack sets price-exhaustion context but does not predict reversal.
+
+Focused local Node execution: **16/16 PASS**.
+
+## TheStrat.ai documentation audit — v0.4
+
+Audit file:
+- `research/THESTRAT-AI-DOC-AUDIT-v0.2.md` (content advanced to v0.4)
+
+Current high-value findings:
+- continuity = evidence, signal = timing, broadening formation = map/magnitude;
+- time expiration and price completion remain separate concepts;
+- multiple timeframes can independently carry the same thesis;
+- a completed signal cannot justify new size by itself;
+- 3-2 carries no setup-defined magnitude and must borrow a validated higher-timeframe objective;
+- kicker is not standalone and requires fast lower-timeframe reconfirmation;
+- prior-range pivots support PMG/target-fuel context;
+- after magnitude, defense can tighten to the nearest valid Level of Reclaim;
+- exact per-pattern Level of Reclaim geometry is still not sufficiently source-verified to encode universally.
+
+### Level of Reclaim safeguard
+
+The schema continues to store:
+- `levelOfReclaim`
+- `reclaimSource`
+- `reclaimVerified`
+
+Unknown reclaim remains `null`.
+
+Do not silently substitute:
+- midpoint stop;
+- structure stop;
+- an inferred pivot;
+- a universal formula.
+
+Exact 2-2 / 2-1-2 / 3-1-2 / hammer / shooter reclaim geometry remains the next source-validation target. If the dedicated site animation is inaccessible, request only that specific screen recording.
+
+## Core setup -> signal -> domino integration
+
+`setup-signal-adapter.js` connects actual core setup objects into the newer state architecture.
+
+Production signal path:
 
 `CORE SETUP -> NORMALIZED SIGNAL -> SIGNAL LIFECYCLE -> DOMINO / CARRIER STATE`
 
-Rules and safeguards:
-- core setup direction and trigger are preserved;
-- setup-defined magnitude is preserved exactly when present;
-- no Level of Reclaim is invented;
-- signal start/end timestamps must come from the data/session layer;
-- non-directional/pending/ambiguous setups do not become actionable signals;
-- lifecycle state determines whether a timeframe is an active carrier;
-- higher timeframes do not become active unless their own trigger is actually in force;
-- mixed bullish/bearish timeframe states remain visible rather than being forced into artificial alignment;
-- thesis and execution timeframe identity remain separate.
-
-The focused adapter harness contains 23 checks. It includes a real `detectSetup()`-generated bullish 2-1-2 fixture plus multi-timeframe core-style setup objects. The harness is committed but is **not being reported as newly PASS-verified** in v0.22 because it was not executed in this tool session.
-
-## TheStrat.ai documentation audit
-
-Current audit file:
-- `research/THESTRAT-AI-DOC-AUDIT-v0.2.md` (content advanced to v0.3)
-
-Current high-value findings remain:
-- continuity = evidence, signal = timing, broadening formation = map/magnitude;
-- signal expiration and price completion are separate concepts;
-- multiple timeframes can independently carry the same directional thesis;
-- after magnitude, a completed signal cannot justify new size by itself; continuation needs a fresh signal or another active higher-timeframe carrier;
-- 3-2 has no setup-defined magnitude and must borrow a validated higher-timeframe objective;
-- kicker is not standalone and requires fast lower-timeframe reconfirmation;
-- prior-range pivots are valid PMG/target-fuel context;
-- exact per-pattern Level of Reclaim geometry remains under audit and must not be inferred from midpoint or structure stops.
-
-## Normalized actionable-signal schema
-
-`signal-schema.js` standardizes setup objects before lifecycle/domino/objective layers consume them.
-
-Important fields include:
-- setup id/family;
-- direction/timeframe;
-- trigger;
-- magnitude and magnitude source;
-- borrowed magnitude/timeframe;
-- Level of Reclaim plus verification/source metadata;
-- signal start/expiration metadata;
-- reference/path metadata.
-
-Unknown reclaim remains `null` until source-verified.
+Safeguards:
+- setup trigger/direction/magnitude are preserved;
+- non-directional or ambiguous setups do not become actionable signals;
+- lifecycle determines active carrier status;
+- higher timeframes activate only through their own observable trigger;
+- mixed-direction timeframe states remain visible;
+- thesis and execution timeframe identity remain separate;
+- Level of Reclaim is never invented by the adapter.
 
 ## Signal lifecycle
 
@@ -103,7 +121,7 @@ Rules:
 Time exhaustion and price exhaustion remain separate.
 
 - Time exhaustion = how much time remains in the active signal bar.
-- Price exhaustion = magnitude completion / fresh-extreme context.
+- Price exhaustion = magnitude completion / fresh-extreme / currently-cleared objective context.
 
 Neither is an automatic reversal signal.
 
@@ -112,8 +130,6 @@ Neither is an automatic reversal signal.
 Keep separate:
 - `PMG_STAIRCASE` = sequential higher-low/lower-high target geometry;
 - `3-1-3` = separate pattern identifier unless dedicated current source material proves equivalence.
-
-PMG geometry itself is not a trade trigger.
 
 ## Timeframe / domino state
 
@@ -125,22 +141,21 @@ Yearly and Quarterly remain supported but not mandatory filters. Lower timeframe
 
 ## Production paths
 
-Objective path:
-
-`SETUP-DEFINED MAGNITUDE -> STRUCTURAL QUALIFICATION -> TARGET HIERARCHY -> OBJECTIVE STATE -> PRICE EXHAUSTION`
-
 Signal path:
 
-`CORE SETUP -> NORMALIZED SIGNAL -> SIGNAL LIFECYCLE -> DOMINO / CARRIER STATE -> OBJECTIVE / MANAGEMENT CONTEXT`
+`CORE SETUP -> NORMALIZED SIGNAL -> SIGNAL LIFECYCLE -> DOMINO / CARRIER STATE`
+
+Objective path:
+
+`SETUP MAGNITUDE -> STRUCTURAL TARGETS / PMG LEVELS -> TARGET HIERARCHY -> OBJECTIVE STATE -> PRICE EXHAUSTION`
 
 ## Next validation/build work
 
-1. continue the TheStrat.ai audit, prioritizing dedicated Level of Reclaim / stop-loss material and exact 2-2 / 2-1-2 / 3-1-2 visuals;
-2. source-verify reclaim geometry pattern-by-pattern and populate `levelOfReclaim` only where proven;
-3. execute the new schema/adapter harnesses in an available Node/CI environment and repair any failures;
-4. connect PMG levels through the production target hierarchy/objective pipeline;
-5. validate lower-to-higher timeframe advancement on real historical charts;
-6. add explicit timeframe/session/anchor metadata to the data model;
-7. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
+1. finish exact Level of Reclaim source audit for 2-2 / 2-1-2 / 3-1-2 and related visuals;
+2. execute the schema/adapter harnesses in an available local/CI environment and repair any failures;
+3. validate lower-to-higher timeframe carrier advancement on real historical charts;
+4. add explicit timeframe/session/bar-anchor metadata to the data model;
+5. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
+6. use those historical records to measure management-card states rather than guessing their effectiveness.
 
-The Research Console remains in sample-data mode until the real-market validation and data-semantics layers are materially complete.
+The Research Console remains in sample-data mode until real-market validation and data-semantics layers are materially complete.
