@@ -28,6 +28,7 @@ t('legacy bearish promotes next target after T1',selectNextMagnitudeTarget({orig
 t('legacy bullish exhaustion when stack cleared',selectNextMagnitudeTarget({originPrice:101,currentPrice:115,direction:'BULLISH',pivots}).exhaustionRisk,true);
 t('legacy bearish exhaustion when stack cleared',selectNextMagnitudeTarget({originPrice:101,currentPrice:90,direction:'BEARISH',pivots}).exhaustionRisk,true);
 t('legacy empty directional stack is exhaustion',buildMagnitudeState({originPrice:120,currentPrice:121,direction:'BULLISH',pivots}).exhaustionRisk,true);
+t('legacy helper exposes explicit price exhaustion',selectNextMagnitudeTarget({originPrice:101,currentPrice:115,direction:'BULLISH',pivots}).priceExhaustionRisk,true);
 
 // Production objective-state behavior: first magnitude is explicit and raw pivots
 // are not promoted unless upstream structure logic marks them relevant.
@@ -45,6 +46,7 @@ t('structural filter excludes raw unqualified and wrong-side pivots',
 let s=buildObjectiveState({originPrice:100,currentPrice:103,direction:'BULLISH',magnitude:105,pivots:qualifiedBull});
 t('before magnitude next objective is magnitude',s.nextObjective,{type:'MAGNITUDE',price:105});
 t('before magnitude exhaustion is false even without considering extra targets',s.exhaustionRisk,false);
+t('before magnitude explicit price exhaustion false',s.priceExhaustionRisk,false);
 
 s=buildObjectiveState({originPrice:100,currentPrice:106,direction:'BULLISH',magnitude:105,pivots:qualifiedBull});
 t('after magnitude first qualified target is promoted',s.nextObjective.id,'valid-1');
@@ -55,6 +57,7 @@ t('consumed first target promotes second qualified target',s.nextObjective.id,'v
 
 s=buildObjectiveState({originPrice:100,currentPrice:116,direction:'BULLISH',magnitude:105,pivots:qualifiedBull});
 t('cleared active qualified target structure sets exhaustion',s.exhaustionRisk,true);
+t('cleared active qualified target structure sets explicit price exhaustion',s.priceExhaustionRisk,true);
 t('cleared active qualified target structure has no next objective',s.nextObjective,null);
 
 const qualifiedBear=[
