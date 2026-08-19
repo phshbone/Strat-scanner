@@ -1,4 +1,4 @@
-# Engine Validation — v0.8
+# Engine Validation — v0.9
 
 Date: 2026-08-19
 
@@ -10,13 +10,44 @@ Corrected core-engine layer: **PASS — 15/15 focused checks in `tests/core-engi
 
 Research Console integration layer: **WIRED.** `index.html` loads `core-engine-v0.3.js` as the deterministic source of truth instead of carrying the superseded inline setup engine.
 
-Setup-specific first-magnitude layer: **ADDED — 10/10 focused checks pass locally.** `setup-magnitude.js` now isolates the first objective for validated 2-2, 2-1-2, and 3-1-2 setup families from the later generic target stack.
+Setup-specific first-magnitude layer: **ADDED — 10/10 focused checks pass locally.** `setup-magnitude.js` isolates the first objective for validated 2-2, 2-1-2, and 3-1-2 setup families from the later generic target stack.
+
+Research outcome/scenario layer: **ADDED — 20/20 focused checks pass locally.** `research-outcomes.js` classifies magnitude-before-stop outcomes, preserves sequence ambiguity, calculates planned/realized R, summarizes win/loss rates, and compares arbitrary scenario groupings.
 
 Real-market validation layer: **STARTED. RM-001 (SPY September 2021 Outside 50 / potential outside month) passes the stated rule geometry and sequence using consistent historical data.**
 
 SSS50 operational-state layer: **ADDED.** The focused validator models INVALID -> STANDBY -> ACTIVE -> COMPLETE in both bullish and bearish directions.
 
 Magnitude target-stack layer: **ADDED — 11/11 deterministic checks pass locally.** The engine can maintain a directional stack of already-validated pivots, consume objectives as price reaches them, promote the next objective, and flag exhaustion when no directional targets remain.
+
+## Research scenario infrastructure
+
+The historical research layer now has an explicit outcome model instead of treating "success rate" as an undefined percentage.
+
+Primary outcome:
+- WIN = magnitude reached before stop;
+- LOSS = stop reached before magnitude;
+- AMBIGUOUS = both occurred but available data cannot establish order;
+- OPEN/UNRESOLVED = no valid resolved result yet.
+
+The scenario comparison engine can group the same preserved event set by any fields supplied to it, including later combinations such as:
+- setup;
+- direction;
+- timeframe;
+- FTFC;
+- Minervini state;
+- Elder state;
+- market/sector alignment;
+- exhaustion state;
+- SSS50 involvement/entry mode;
+- price bucket;
+- stop model.
+
+This creates the infrastructure for comparisons such as Strat alone vs Strat + FTFC vs Strat + FTFC + Minervini/Elder without redefining the base Strat setup.
+
+Every percentage must retain its sample size. Exploratory combinations are not promoted until they survive out-of-sample validation.
+
+See `RESEARCH-SCENARIO-SPEC.md`, `research-outcomes.js`, and `tests/research-outcomes-validation.js`.
 
 ## Research Console v0.2 integration correction
 
@@ -32,7 +63,7 @@ The live sample console now:
 
 ## Setup-specific first magnitude
 
-A separate selector now expresses the sourced setup geometry before the general pivot stack is considered.
+A separate selector expresses the sourced setup geometry before the general pivot stack is considered.
 
 For the currently validated setup families:
 - bullish 2-2 -> source-range high;
@@ -70,10 +101,10 @@ Correct behavior:
 ## SSS50 state clarification
 
 The engine records:
-- `INVALID` — no failed-two condition yet,
-- `STANDBY` — one side taken and failed back into prior range, midpoint not yet crossed,
-- `ACTIVE` — failed two + prior midpoint crossed; opposite side is target,
-- `COMPLETE` — both sides of prior candle taken.
+- `INVALID`
+- `STANDBY`
+- `ACTIVE`
+- `COMPLETE`
 
 ## Magnitude / pivot-stack clarification
 
@@ -104,17 +135,18 @@ A separate unadjusted monthly series corroborates the outside-month geometry. Ad
 
 ## Scope note
 
-These checks validate rule implementation. They do **not** establish profitability, expectancy, or general statistical edge.
+These checks validate rule implementation and research accounting. They do **not** establish profitability, expectancy, or a historical win rate.
 
 ## Next validation work
 
 1. build real historical OHLC fixtures for 2-2 and confirm the selected source range / first magnitude;
 2. repeat for 2-1-2;
 3. repeat for 3-1-2;
-4. validate price exhaustion after magnitude completion;
-5. validate multi-timeframe domino sequences;
-6. validate outside-bar sequence resolution with lower-timeframe data;
-7. validate configurable timeframe groups on real charts;
-8. then connect a low-cost historical data adapter for broader backtesting.
+4. feed those events through the new outcome engine;
+5. validate price exhaustion after magnitude completion;
+6. validate multi-timeframe domino sequences;
+7. validate outside-bar sequence resolution with lower-timeframe data;
+8. validate configurable timeframe groups on real charts;
+9. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
 
-The Research Console remains in sample-data mode until this layer is materially complete.
+The Research Console remains in sample-data mode until the real-market validation layer is materially complete.
