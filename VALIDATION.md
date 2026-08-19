@@ -1,4 +1,4 @@
-# Engine Validation — v0.18
+# Engine Validation — v0.19
 
 Date: 2026-08-19
 
@@ -8,7 +8,8 @@ Date: 2026-08-19
 - Corrected core engine: **15/15 PASS** in `tests/core-engine-v0.3-validation.js`.
 - Setup-specific first magnitude: **10/10 PASS** in `tests/setup-magnitude-validation-v0.1.js`.
 - Research outcome/scenario layer: **20/20 PASS** in `tests/research-outcomes-validation.js`.
-- Post-magnitude objective/exhaustion layer: **24/24 PASS** in `tests/magnitude-validation.js`.
+- Post-magnitude objective layer: deterministic behavior preserved; terminology now exposes explicit `priceExhaustionRisk` while retaining `exhaustionRisk` as a temporary compatibility alias.
+- Explicit time/price exhaustion layer: **21/21 PASS locally** in `tests/exhaustion-validation.js`.
 - Structural target qualification layer: **19/19 PASS** in `tests/target-qualification-validation.js`.
 - Target hierarchy / de-duplication layer: **18/18 PASS** in `tests/target-hierarchy-validation.js`.
 - Integrated multi-timeframe objective pipeline: **20/20 PASS** in `tests/objective-pipeline-validation.js`.
@@ -17,75 +18,88 @@ Date: 2026-08-19
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Pivot Machine Gun (PMG) — new in v0.18
+## TheStrat.ai documentation audit — new in v0.19
 
-`pmg.js` adds deterministic PMG staircase detection without treating the geometry itself as a trade trigger.
+The free TheStrat.ai help material is now being treated as a structured operational cross-check, not as a replacement for Rob Smith canonical rules.
 
-### General geometry
+Audit file:
+- `research/THESTRAT-AI-DOC-AUDIT-v0.1.md`
 
-- bearish PMG candidate = consecutive strictly higher lows;
-- bullish PMG candidate = consecutive strictly lower highs;
-- default general detector minimum = 5 bars;
-- equality breaks the strict sequence.
+Current high-value confirmations/refinements:
 
-A public TheStrat indicator description states that PMG labels 5 or more consecutive candles making higher lows or 5 or more making lower highs.
+### Continuity + signal + broadening formation
+The current docs explicitly separate:
+- continuity = evidence;
+- actionable signal = timing;
+- broadening formation = map/magnitude.
 
-Sara Strat Sniper's published `Strat M PMG Short` TrendSpider scanner is slightly stricter in literal form: current monthly low is above low[1], which is above low[2], continuing through low[5]. That is six monthly candles connected by five strict higher-low comparisons.
+This matches the current engine separation of FTFC/context, setup trigger, and objective structure.
 
-The engine preserves both:
-- default general PMG detector: `minBars = 5`;
-- `SARA_MONTHLY_SHORT` preset: 6 bars to reproduce Sara's published scanner criterion.
+### Lower-timeframe timing into higher-timeframe objectives
+The docs show lower-timeframe signals/broadening being used to time higher-timeframe moves. This supports the domino architecture while preserving the safeguard that a lower timeframe cannot place a higher-timeframe trigger in force unless price actually crosses that higher-timeframe trigger.
 
-### Actionable-state safeguard
+### Three-price signal model
+The current docs describe signals with three prices:
+1. signal / trigger;
+2. target / magnitude;
+3. level of reclaim.
 
-PMG geometry alone does not create an entry.
+The engine already stores trigger and magnitude. `levelOfReclaim` is now a required field for the next core setup-object revision rather than being conflated with a generic stop.
 
-`buildPmgState()` requires a separate Strat reversal:
-- the reversal must be in force;
-- its direction must match the PMG traversal direction.
+### 3-2 expansion safeguard
+The current docs state that a 3-2 is range expansion and has no magnitude of its own. When 3-2 is implemented, the core selector must return no setup-defined magnitude unless a separately validated higher-timeframe magnitude is supplied.
 
-States:
-- `NO_PMG`
-- `PMG_WAITING_FOR_REVERSAL`
-- `PMG_IN_FORCE`
+## Exhaustion terminology correction — new in v0.19
 
-This prevents the engine from assuming that a staircase must reverse.
+TheStrat.ai documentation makes an important distinction that our generic `exhaustionRisk` naming did not express clearly enough.
 
-### PMG target integration
+### Exhaustion by time
+Mechanical question: how much time remains before the actionable signal's bar closes/expires?
 
-For bearish PMG:
-- staircase lows are emitted as sequential downside levels.
+New module:
+- `exhaustion.js`
 
-For bullish PMG:
-- staircase highs are emitted as sequential upside levels.
+New deterministic state includes:
+- exact elapsed percentage;
+- exact remaining percentage;
+- signal start/end timestamps;
+- active / not-started / expired state;
+- no invented LOW/MEDIUM/HIGH numerical thresholds.
 
-PMG levels carry structural-target metadata so they can pass into the existing target hierarchy/objective machinery rather than creating a separate target system.
+### Exhaustion by price
+Separate condition associated with completing magnitude / clearing the currently active objective structure or entering fresh extremes.
 
-Current integration path:
+`magnitude.js` now exposes:
+- `priceExhaustionRisk`
+- legacy `exhaustionRisk` alias temporarily retained for dependent-module compatibility.
 
-`PMG GEOMETRY -> VALID STRAT REVERSAL / IN FORCE -> PMG LEVELS -> TARGET HIERARCHY -> OBJECTIVE / EXHAUSTION`
+Time exhaustion and price exhaustion must never be treated as the same condition in research data or Trade Coach logic.
 
-### Focused PMG validation
+### Focused validation
+`tests/exhaustion-validation.js`: **21/21 PASS locally**.
 
-`tests/pmg-validation.js` reports **21/21 PASS locally** and verifies:
-- five-bar higher-low and lower-high PMG geometry;
-- strict inequality;
-- Sara six-bar monthly-short preset;
-- correct level extraction/order;
-- source/timeframe metadata;
-- geometry waiting for a reversal;
-- matching in-force reversal activation;
-- opposite-direction/out-of-force rejection;
-- invalid configuration rejection.
+It validates:
+- 0%, 50%, 91.667%, and 100% elapsed examples;
+- exact remaining percentage;
+- active vs expired state;
+- pre-start clamping;
+- separate time-only and price-only exhaustion states;
+- invalid time windows rejected.
 
-See:
-- `pmg.js`
-- `tests/pmg-validation.js`
-- `PMG-SPEC.md`
+## PMG terminology safeguard
+
+The current PMG staircase detector remains based on Sara's published scanner geometry and sequential higher-low/lower-high pivot structure.
+
+TheStrat.ai current material also describes pivot-after-pivot travel through prior ranges as PMG fuel. One older/general setup-guide page labels `3-1-3` as "Pivot Machine Gun." Until dedicated current source material resolves that naming, the engine must keep these separate:
+
+- `PMG_STAIRCASE` = sequential higher lows / lower highs used as target structure;
+- `3-1-3` = distinct setup/pattern identifier if implemented later.
+
+Do not silently redefine the staircase detector as 3-1-3.
 
 ## Timeframe / domino state
 
-`timeframe-domino.js` supports the timeframe ladder:
+`timeframe-domino.js` supports:
 
 `Y -> Q -> M -> W -> D -> 60 -> 30 -> 15 -> 5`
 
@@ -95,23 +109,15 @@ Default convenience profiles:
 - `SWING_WITH_ENTRY`: M/W/D/60/30/15
 - `INTRADAY`: D/60/30/15/5
 
-Profiles are presets only; custom timeframe groups remain allowed.
-
-A lower timeframe becoming actionable does not automatically activate a higher timeframe. Each higher timeframe joins the chain only when its own trigger becomes in force. Thesis and execution timeframes remain separate.
+Profiles remain presets only; custom groups are allowed.
 
 ## Integrated objective pipeline
 
-`objective-pipeline.js` runs:
+Production path remains:
 
-`SETUP-DEFINED MAGNITUDE -> STRUCTURAL RANGE QUALIFICATION -> TARGET HIERARCHY / EXACT DE-DUP -> OBJECTIVE STATE -> EXHAUSTION`
+`SETUP-DEFINED MAGNITUDE -> STRUCTURAL RANGE QUALIFICATION -> TARGET HIERARCHY / EXACT DE-DUP -> OBJECTIVE STATE -> PRICE EXHAUSTION`
 
-Verified safeguards include:
-- setup-defined magnitude remains first;
-- only structurally engaged broader ranges qualify;
-- exact same-price targets can merge while preserving provenance;
-- target order follows price path, not timeframe prestige;
-- unengaged higher-timeframe ranges are not silently promoted;
-- exhaustion occurs only after currently qualified structure is cleared.
+Time exhaustion is calculated independently from the signal bar's clock.
 
 ## Real-market validation summary
 
@@ -135,7 +141,13 @@ Primary outcome states remain:
 - AMBIGUOUS = both occurred but available data cannot establish order;
 - OPEN / UNRESOLVED = no valid resolved result yet.
 
-Scenario grouping can later compare setup, direction, timeframe, FTFC, Minervini state, Elder state, market/sector alignment, exhaustion state, SSS50 involvement, price bucket, stop model, long-term alignment, PMG presence/level count, and combinations thereof.
+Scenario fields now need to distinguish:
+- `timeExhaustionRisk`
+- `timeRemainingPct`
+- `priceExhaustionRisk`
+- `levelOfReclaim`
+- `carrierTimeframes[]`
+- `borrowedMagnitudeTimeframe`
 
 Every reported percentage must retain sample size. Exploratory findings must survive out-of-sample validation before being treated as useful evidence.
 
@@ -154,21 +166,18 @@ Every reported percentage must retain sample size. Exploratory findings must sur
 - Yearly/Quarterly are supported but never required by default;
 - a lower timeframe cannot falsely activate a higher timeframe;
 - thesis and execution timeframe identity are stored separately;
-- exhaustion is not a reversal signal;
+- time exhaustion and price exhaustion are separate states;
+- neither exhaustion type is an automatic reversal signal;
 - these tests validate implementation, not profitability or historical expectancy.
-
-## Deferred automation note
-
-Adaptive automated trade-management behavior remains outside the current deterministic research build. The architecture preserves thesis/execution states so a later management/automation layer can change management granularity without redefining the original setup.
 
 ## Next validation/build work
 
-1. integrate PMG levels with the production target hierarchy/objective pipeline in a focused end-to-end fixture;
-2. return to domino work: integrate actual setup objects emitted by the core engine rather than synthetic timeframe states;
-3. validate historical lower-to-higher timeframe advancement on real charts;
-4. validate outside-bar sequence resolution with lower-timeframe data;
-5. add explicit timeframe/session/anchor metadata to the data model;
-6. validate configurable timeframe groups on real charts, including Y/Q/M/W/D long-term groups;
+1. continue the TheStrat.ai documentation audit across actionable signals, levels of reclaim, reversals, PMG, broadening, and management before hardening those modules;
+2. add `levelOfReclaim` and signal-expiration metadata to actual core setup objects;
+3. integrate PMG levels with the production target hierarchy/objective pipeline in a focused end-to-end fixture;
+4. return to domino work using actual core-engine setup objects instead of synthetic timeframe states;
+5. validate historical lower-to-higher timeframe advancement on real charts;
+6. add explicit timeframe/session/anchor metadata to the data model;
 7. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
 
 The Research Console remains in sample-data mode until the real-market validation and data-semantics layers are materially complete.
