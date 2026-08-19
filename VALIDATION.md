@@ -1,4 +1,4 @@
-# Engine Validation — v0.30
+# Engine Validation — v0.31
 
 Date: 2026-08-19
 
@@ -10,8 +10,9 @@ Date: 2026-08-19
 - Research outcome/scenario layer: **20/20 PASS** in `tests/research-outcomes-validation.js`.
 - Explicit time/price exhaustion layer: **21/21 PASS locally** in `tests/exhaustion-validation.js`.
 - Structural target qualification layer: **19/19 PASS** in `tests/target-qualification-validation.js`.
-- Target hierarchy / de-duplication layer: **18/18 PASS** in `tests/target-hierarchy-validation.js`.
-- Integrated multi-timeframe objective pipeline: **20/20 PASS** in `tests/objective-pipeline-validation.js`.
+- Target hierarchy / de-duplication layer: **22/22 PASS locally** in `tests/target-hierarchy-validation.js` after cross-source provenance support.
+- Integrated multi-timeframe objective pipeline regression: **20/20 PASS locally** in `tests/objective-pipeline-validation.js` after reclaim integration.
+- Reclaimed-range -> objective integration: **19/19 PASS locally** in `tests/reclaim-objective-pipeline-validation.js`.
 - Timeframe/domino state layer: **20/20 PASS** in `tests/timeframe-domino-validation.js`.
 - PMG geometry/actionable-state layer: **21/21 PASS** in `tests/pmg-validation.js`.
 - PMG -> production objective integration: **16/16 PASS locally** in `tests/pmg-objective-pipeline-validation.js`.
@@ -24,18 +25,65 @@ Date: 2026-08-19
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Range-aware reclaim engine — new in v0.30
+## Reclaimed-range objective integration — new in v0.31
 
-New module:
-- `range-reclaim.js`
+Updated modules:
+- `objective-pipeline.js`
+- `target-hierarchy.js`
 
 New focused harness:
-- `tests/range-reclaim-validation.js`
+- `tests/reclaim-objective-pipeline-validation.js`
 
 New specification:
-- `RANGE-RECLAIM-SPEC.md`
+- `RECLAIM-OBJECTIVE-INTEGRATION-SPEC.md`
 
-This is the first production module that implements reclaim as an explicit structural range traversal rather than as a setup-only placeholder.
+Production objective path is now operationally unified:
+
+`SETUP MAGNITUDE -> STRUCTURAL RANGE TARGETS + VERIFIED RECLAIM TARGETS -> EXACT-PRICE MERGE -> PRICE-PATH ORDER -> OBJECTIVE STATE -> PRICE EXHAUSTION`
+
+### Integration rules
+
+- setup-defined magnitude remains the first objective;
+- `range-reclaim.js` remains the only module in this path that determines whether a verified reclaimed range currently emits an objective;
+- the objective pipeline adapts active reclaim objectives into the common target schema without inventing geometry;
+- structural targets and reclaim targets are ordered by actual price path, never by timeframe prestige or source prestige;
+- an active unconsumed reclaim target prevents price exhaustion after magnitude;
+- once all currently qualified structural/reclaim targets are consumed, price exhaustion becomes true;
+- a completed reclaim target is structural completion, not an automatic reversal prediction;
+- an unverified reclaim range cannot create a target or suppress price exhaustion.
+
+### Exact-price cross-source agreement
+
+`target-hierarchy.js` now preserves provenance when multiple sources resolve to the same exact price.
+
+Merged exact levels retain:
+- supporting target IDs;
+- supporting timeframes;
+- supporting range IDs;
+- supporting sources;
+- supporting source types.
+
+This allows, for example, a Daily structural range boundary and a Weekly reclaimed-range opposite boundary at the exact same price to become one price objective with two independent structural reasons.
+
+Near-but-not-equal prices remain distinct semantic objectives. Existing proximity clustering remains advisory only.
+
+### Focused local execution
+
+On 2026-08-19 after integration:
+- `tests/target-hierarchy-validation.js`: **22/22 PASS**;
+- `tests/objective-pipeline-validation.js`: **20/20 PASS**;
+- `tests/reclaim-objective-pipeline-validation.js`: **19/19 PASS**.
+
+## Range-aware reclaim engine — v0.30 foundation
+
+Module:
+- `range-reclaim.js`
+
+Focused harness:
+- `tests/range-reclaim-validation.js`
+
+Specification:
+- `RANGE-RECLAIM-SPEC.md`
 
 Structural path:
 
@@ -66,17 +114,6 @@ For an upstream-verified prior range `[low, high]`:
 - `TRAVERSING_RECLAIMED_RANGE`
 - `RECLAIM_RANGE_TARGET_HIT`
 - `RECLAIM_RANGE_FAILED`
-
-### Objective emission
-
-An actively reclaimed range emits a structural objective with:
-- source type `RECLAIMED_RANGE_OPPOSITE_BOUNDARY`;
-- exact opposite range boundary as price;
-- source range ID;
-- source timeframe;
-- consumed state when the opposite side is reached.
-
-`buildReclaimStack()` also supports multiple nested verified ranges and orders active objectives by actual price path rather than timeframe prestige.
 
 ### Safeguards
 
@@ -167,7 +204,7 @@ Carrier interpretation path:
 
 Objective path:
 
-`SETUP MAGNITUDE -> STRUCTURAL TARGETS / PMG LEVELS / RECLAIMED-RANGE OBJECTIVES -> TARGET HIERARCHY -> OBJECTIVE STATE -> PRICE EXHAUSTION`
+`SETUP MAGNITUDE -> STRUCTURAL TARGETS / PMG LEVELS / VERIFIED RECLAIMED-RANGE OBJECTIVES -> TARGET HIERARCHY -> OBJECTIVE STATE -> PRICE EXHAUSTION`
 
 Reclaim path:
 
@@ -183,13 +220,12 @@ Breadth path requirement:
 
 ## Next validation/build work
 
-1. connect range-reclaim objectives into the existing target hierarchy / objective-exhaustion pipeline;
-2. add explicit timeframe/session/bar-anchor/period-open metadata to the data model before broader intraday historical validation;
-3. execute carrier-interpretation/schema/adapter harnesses in Node or CI and repair failures;
-4. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
-5. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including an explicit mixed-breadth state;
-6. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome rather than forcing a trade suggestion;
-7. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
-8. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
+1. add explicit timeframe/session/bar-anchor/period-open metadata to the data model before broader intraday historical validation;
+2. execute carrier-interpretation/schema/adapter harnesses in Node or CI and repair failures;
+3. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
+4. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including an explicit mixed-breadth state;
+5. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome rather than forcing a trade suggestion;
+6. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
+7. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
 
 The Research Console remains in sample-data mode until real-market validation and data-semantics layers are materially complete.
