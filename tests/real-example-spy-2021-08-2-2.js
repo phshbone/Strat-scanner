@@ -10,6 +10,11 @@ function t(name,actual,expected){
   if(ok) pass++;
   else { fail++; failures.push({name,actual,expected}); }
 }
+function approx(name,actual,expected,tolerance=1e-9){
+  const ok=Number.isFinite(actual) && Math.abs(actual-expected)<=tolerance;
+  if(ok) pass++;
+  else { fail++; failures.push({name,actual,expected}); }
+}
 
 // Adjusted SPY daily OHLC from StatMuse, August 2021.
 const bars=[
@@ -34,7 +39,7 @@ t("bull trigger",bull.trigger,412.29);
 t("bull first magnitude",bull.magnitude,415.55);
 
 const bullTrade=core.calculateTrade(bull,bars[3].close);
-t("bull midpoint stop",bullTrade.midpointStop,409.945);
+approx("bull midpoint stop",bullTrade.midpointStop,409.945);
 t("bull signal bar did not hit magnitude",bars[3].high>=bull.magnitude,false);
 t("bull signal bar did not hit midpoint stop",bars[3].low<=bullTrade.midpointStop,false);
 t("bull next bar hit magnitude",bars[4].high>=bull.magnitude,true);
@@ -60,7 +65,7 @@ t("bear trigger",bear.trigger,418.49);
 t("bear first magnitude",bear.magnitude,418.16);
 
 const bearTrade=core.calculateTrade(bear,bars[7].close);
-t("bear midpoint stop",bearTrade.midpointStop,419.28);
+approx("bear midpoint stop",bearTrade.midpointStop,419.28);
 t("bear signal bar hit magnitude",bars[7].low<=bear.magnitude,true);
 t("bear signal bar also hit midpoint stop",bars[7].high>=bearTrade.midpointStop,true);
 t("bear signal bar did not hit structure stop",bars[7].high>=bearTrade.structureStop,false);
