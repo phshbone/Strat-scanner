@@ -48,9 +48,72 @@ PASS for the stated Outside 50 sequence and target geometry.
 
 This is one known example. It is validation of rule implementation, not evidence of statistical expectancy or profitability.
 
+---
+
+## Case RM-002 — SPY August 2021 daily 2-2 reversals
+
+Historical source: adjusted SPY daily OHLC from StatMuse for August 2021. Code fixture: `tests/real-example-spy-2021-08-2-2.js`.
+
+### RM-002A — bullish 2-2 on August 20
+Relevant bars:
+- Aug 17: H 415.86 / L 412.02
+- Aug 18: H 415.55 / L 410.22 => 2D vs Aug 17
+- Aug 19: H 412.29 / L 407.60 => 2D vs Aug 18
+- Aug 20: H 414.69 / L 410.96 => 2U vs Aug 19
+- Aug 23: H 418.92 / L 414.44
+
+Engine result:
+- setup: bullish `2-2`
+- trigger: Aug 19 high = 412.29
+- source range for first magnitude: Aug 18
+- first magnitude: Aug 18 high = 415.55
+- midpoint stop on Aug 19 signal/reference bar: 409.945
+
+Outcome with midpoint-stop model:
+- Aug 20 triggered the 2U but neither hit the 415.55 magnitude nor the 409.945 midpoint stop;
+- Aug 23 traded above 415.55;
+- result = **WIN: magnitude before midpoint stop**.
+
+This confirms the engine's current bullish 2-2 first-magnitude geometry on a real daily sequence.
+
+### RM-002B — bearish 2-2 on August 26
+Relevant bars:
+- Aug 23: H 418.92 / L 414.44
+- Aug 24: H 419.21 / L 418.16 => 2U vs Aug 23
+- Aug 25: H 420.07 / L 418.49 => 2U vs Aug 24
+- Aug 26: H 419.51 / L 416.98 => 2D vs Aug 25
+
+Engine result:
+- setup: bearish `2-2`
+- trigger: Aug 25 low = 418.49
+- source range for first magnitude: Aug 24
+- first magnitude: Aug 24 low = 418.16
+- midpoint stop on Aug 25 signal/reference bar: 419.28
+- structure stop: Aug 25 high = 420.07
+
+Outcome comparison:
+- Aug 26 traded below the 418.16 magnitude and above the 419.28 midpoint stop inside the same daily bar;
+- daily OHLC alone cannot prove which happened first;
+- midpoint-stop scenario = **AMBIGUOUS** until lower-timeframe path is supplied;
+- Aug 26 did not reach the 420.07 structure stop, so the structure-stop scenario = **WIN**.
+
+This is an important research example because the identical Strat setup produces different backtest resolution depending on stop model and available path granularity. The engine must preserve that distinction rather than force a win or loss from coarse daily OHLC.
+
+### RM-002 focused test status
+`tests/real-example-spy-2021-08-2-2.js`: **PASS — 23/23 checks locally.**
+
+### Status
+PASS for:
+- real daily bullish and bearish 2-2 detection;
+- setup-specific source-range / first-magnitude selection;
+- midpoint-stop vs structure-stop scenario separation;
+- preservation of same-bar sequence ambiguity.
+
+This validates implementation on two real examples only. It does not establish a historical success rate or expectancy.
+
 ### Web sources consulted
 - StatMuse, SPY August 2021 daily history
 - StatMuse, SPY September 2021 daily history
 - Kabutan US, SPY monthly historical prices
 
-Retrieved: 2026-08-18.
+Retrieved: 2026-08-18 to 2026-08-19.
