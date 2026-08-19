@@ -1,4 +1,4 @@
-# Engine Validation — v0.10
+# Engine Validation — v0.11
 
 Date: 2026-08-19
 
@@ -14,9 +14,11 @@ Setup-specific first-magnitude layer: **ADDED — 10/10 focused checks pass loca
 
 Research outcome/scenario layer: **ADDED — 20/20 focused checks pass locally.** `research-outcomes.js` classifies magnitude-before-stop outcomes, preserves sequence ambiguity, calculates planned/realized R, summarizes win/loss rates, and compares arbitrary scenario groupings.
 
-Real-market 2-2 validation layer: **ADDED — 23/23 focused checks pass locally.** `tests/real-example-spy-2021-08-2-2.js` validates one bullish and one bearish SPY daily 2-2 sequence from August 2021, including first-magnitude selection and stop-model/path-resolution differences.
+Real-market 2-2 validation layer: **ADDED.** `tests/real-example-spy-2021-08-2-2.js` validates bullish and bearish SPY daily 2-2 sequences from August 2021, including first-magnitude selection and stop-model/path-resolution differences.
 
-Real-market validation layer also includes RM-001 (SPY September 2021 Outside 50 / potential outside month), which passes the stated rule geometry and sequence using consistent historical data.
+Real-market 2-1-2 validation layer: **ADDED.** `tests/real-example-spy-2021-11-2-1-2.js` validates one bearish and one bullish SPY daily 2-1-2 sequence from November 2021, including first magnitude, midpoint-stop ambiguity, and structure-stop comparison.
+
+Real-market validation also includes RM-001 (SPY September 2021 Outside 50 / potential outside month), which passes the stated rule geometry and sequence using consistent historical data.
 
 SSS50 operational-state layer: **ADDED.** The focused validator models INVALID -> STANDBY -> ACTIVE -> COMPLETE in both bullish and bearish directions.
 
@@ -25,32 +27,48 @@ Magnitude target-stack layer: **ADDED — 11/11 deterministic checks pass locall
 ## Real-market 2-2 validation — RM-002
 
 ### Bullish SPY daily 2-2, August 20 2021
-The engine identifies:
-- Aug 19 as the active 2D reference bar;
-- Aug 20 as the reversing 2U;
-- trigger = Aug 19 high 412.29;
-- first magnitude = Aug 18 high 415.55;
-- midpoint stop = 409.945.
-
-Aug 20 did not reach the magnitude or midpoint stop. Aug 23 reached the magnitude. Outcome under the midpoint-stop model: **WIN**.
+- trigger = Aug 19 high 412.29
+- first magnitude = Aug 18 high 415.55
+- midpoint stop = 409.945
+- magnitude reached Aug 23 before midpoint stop => **WIN**.
 
 ### Bearish SPY daily 2-2, August 26 2021
-The engine identifies:
-- Aug 25 as the active 2U reference bar;
-- Aug 26 as the reversing 2D;
-- trigger = Aug 25 low 418.49;
-- first magnitude = Aug 24 low 418.16;
-- midpoint stop = 419.28;
-- structure stop = 420.07.
+- trigger = Aug 25 low 418.49
+- first magnitude = Aug 24 low 418.16
+- midpoint stop = 419.28
+- structure stop = 420.07
+- Aug 26 traded through both magnitude and midpoint stop in the same daily bar => midpoint-stop scenario **AMBIGUOUS**;
+- structure stop was not reached => structure-stop scenario **WIN**.
 
-The Aug 26 daily bar traded through both the magnitude and midpoint stop. Daily OHLC cannot establish their order, so the midpoint-stop scenario is **AMBIGUOUS**. The same bar did not reach the structure stop, so the structure-stop scenario is **WIN**.
+## Real-market 2-1-2 validation — RM-003
 
-This confirms two important research behaviors:
-1. first magnitude for these real 2-2 cases matches the setup-defined source range used by the engine;
-2. stop-model comparison can materially change outcome classification, and coarse OHLC must not force a result when sequence is unknown.
+### Bearish SPY daily 2-1-2, November 9 2021
+- Nov 5 = 2U
+- Nov 8 = inside (`1`)
+- Nov 9 = 2D
+- trigger = Nov 8 low 438.99
+- first magnitude = Nov 5 low 437.78
+- midpoint stop = 439.94
+- structure stop = 440.89
+- Nov 9 traded through both magnitude and midpoint stop in the same daily bar => midpoint-stop scenario **AMBIGUOUS**;
+- structure stop was not reached => structure-stop scenario **WIN**.
+
+### Bullish SPY daily 2-1-2, November 12 2021
+- Nov 10 = 2D
+- Nov 11 = inside (`1`)
+- Nov 12 = 2U
+- trigger = Nov 11 high 436.26
+- first magnitude = Nov 10 high 438.22
+- midpoint stop = 435.535
+- structure stop = 434.81
+- Nov 12 traded through both magnitude and midpoint stop in the same daily bar => midpoint-stop scenario **AMBIGUOUS**;
+- structure stop was not reached => structure-stop scenario **WIN**.
+
+These cases reinforce an important backtest rule: coarse daily OHLC must not force an intrabar ordering when both stop and magnitude occur in the same bar.
 
 See:
 - `tests/real-example-spy-2021-08-2-2.js`
+- `tests/real-example-spy-2021-11-2-1-2.js`
 - `tests/REAL-MARKET-VALIDATION.md`
 
 ## Research scenario infrastructure
@@ -140,13 +158,12 @@ These checks validate rule implementation and research accounting. They do **not
 
 ## Next validation work
 
-1. build real historical OHLC fixtures for 2-1-2 and confirm first magnitude;
-2. repeat for 3-1-2;
-3. feed those events through the outcome engine under midpoint-stop and structure-stop scenarios;
-4. validate price exhaustion after magnitude completion;
-5. validate multi-timeframe domino sequences;
-6. validate outside-bar sequence resolution with lower-timeframe data;
-7. validate configurable timeframe groups on real charts;
-8. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
+1. build real historical OHLC fixtures for 3-1-2 and confirm first magnitude;
+2. feed 3-1-2 events through midpoint-stop and structure-stop scenarios;
+3. validate price exhaustion after magnitude completion;
+4. validate multi-timeframe domino sequences;
+5. validate outside-bar sequence resolution with lower-timeframe data;
+6. validate configurable timeframe groups on real charts;
+7. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
 
 The Research Console remains in sample-data mode until the real-market validation layer is materially complete.
