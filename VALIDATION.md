@@ -1,4 +1,4 @@
-# Engine Validation — v0.21
+# Engine Validation — v0.22
 
 Date: 2026-08-19
 
@@ -15,64 +15,75 @@ Date: 2026-08-19
 - Timeframe/domino state layer: **20/20 PASS** in `tests/timeframe-domino-validation.js`.
 - PMG geometry/actionable-state layer: **21/21 PASS** in `tests/pmg-validation.js`.
 - Actionable signal lifecycle layer: **25/25 PASS locally** in `tests/signal-lifecycle-validation.js`.
-- Normalized actionable-signal schema: focused harness added in `tests/signal-schema-validation.js`; execution could not be re-run in this tool session because the local runtime could not resolve GitHub.
+- Normalized actionable-signal schema: focused harness added in `tests/signal-schema-validation.js`; execution was not re-run in the current tool session.
+- Core setup -> signal -> lifecycle -> domino adapter: focused harness added in `tests/setup-signal-adapter-validation.js`; execution was not re-run in the current tool session.
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## TheStrat.ai documentation audit — expanded in v0.21
+## Core setup -> signal -> domino integration — new in v0.22
+
+New module:
+- `setup-signal-adapter.js`
+
+New focused harness:
+- `tests/setup-signal-adapter-validation.js`
+
+New spec:
+- `SETUP-SIGNAL-ADAPTER-SPEC.md`
+
+This is the first bridge from actual setup objects emitted by `core-engine-v0.3.js` into the newer signal/lifecycle/domino architecture.
+
+Production path is now materially connected as:
+
+`CORE SETUP -> NORMALIZED SIGNAL -> SIGNAL LIFECYCLE -> DOMINO / CARRIER STATE`
+
+Rules and safeguards:
+- core setup direction and trigger are preserved;
+- setup-defined magnitude is preserved exactly when present;
+- no Level of Reclaim is invented;
+- signal start/end timestamps must come from the data/session layer;
+- non-directional/pending/ambiguous setups do not become actionable signals;
+- lifecycle state determines whether a timeframe is an active carrier;
+- higher timeframes do not become active unless their own trigger is actually in force;
+- mixed bullish/bearish timeframe states remain visible rather than being forced into artificial alignment;
+- thesis and execution timeframe identity remain separate.
+
+The focused adapter harness contains 23 checks. It includes a real `detectSetup()`-generated bullish 2-1-2 fixture plus multi-timeframe core-style setup objects. The harness is committed but is **not being reported as newly PASS-verified** in v0.22 because it was not executed in this tool session.
+
+## TheStrat.ai documentation audit
 
 Current audit file:
 - `research/THESTRAT-AI-DOC-AUDIT-v0.2.md` (content advanced to v0.3)
 
-New confirmed/refined points:
+Current high-value findings remain:
 - continuity = evidence, signal = timing, broadening formation = map/magnitude;
-- signal expiration and price completion remain separate concepts;
+- signal expiration and price completion are separate concepts;
 - multiple timeframes can independently carry the same directional thesis;
 - after magnitude, a completed signal cannot justify new size by itself; continuation needs a fresh signal or another active higher-timeframe carrier;
 - 3-2 has no setup-defined magnitude and must borrow a validated higher-timeframe objective;
 - kicker is not standalone and requires fast lower-timeframe reconfirmation;
-- moves back through prior ranges are structurally preferred PMG/target-fuel contexts over fresh extremes;
+- prior-range pivots are valid PMG/target-fuel context;
 - exact per-pattern Level of Reclaim geometry remains under audit and must not be inferred from midpoint or structure stops.
 
-## Normalized actionable-signal schema — new in v0.21
+## Normalized actionable-signal schema
 
-New module:
-- `signal-schema.js`
+`signal-schema.js` standardizes setup objects before lifecycle/domino/objective layers consume them.
 
-New focused harness:
-- `tests/signal-schema-validation.js`
+Important fields include:
+- setup id/family;
+- direction/timeframe;
+- trigger;
+- magnitude and magnitude source;
+- borrowed magnitude/timeframe;
+- Level of Reclaim plus verification/source metadata;
+- signal start/expiration metadata;
+- reference/path metadata.
 
-Purpose: standardize the setup object before lifecycle/domino/objective layers consume it.
-
-Fields include:
-- `setupId`
-- `setupFamily`
-- `direction`
-- `timeframe`
-- `trigger`
-- `magnitude`
-- `magnitudeSource`
-- `borrowedMagnitude`
-- `borrowedMagnitudeTimeframe`
-- `levelOfReclaim`
-- `reclaimSource`
-- `reclaimVerified`
-- signal start/expiration metadata
-- reference/path metadata
-
-Safeguards:
-- unknown reclaim remains `null`;
-- midpoint/structure stop is never silently substituted for reclaim;
-- reclaim provenance and source verification are explicit;
-- setup magnitude is preferred when present;
-- expansion setups may carry `magnitude = null` and explicitly borrow a higher-timeframe magnitude;
-- invalid direction/trigger input is rejected.
-
-The focused harness contains 20 assertions. It was added to the repository, but this turn's local execution attempt could not run because the runtime could not resolve `github.com`; therefore this file is not being reported as newly PASS-verified in v0.21.
+Unknown reclaim remains `null` until source-verified.
 
 ## Signal lifecycle
 
-`signal-lifecycle.js` represents a signal as a time-bounded state:
+`signal-lifecycle.js` states:
 - `NOT_STARTED`
 - `STANDBY`
 - `ACTIVE`
@@ -126,11 +137,10 @@ Signal path:
 
 1. continue the TheStrat.ai audit, prioritizing dedicated Level of Reclaim / stop-loss material and exact 2-2 / 2-1-2 / 3-1-2 visuals;
 2. source-verify reclaim geometry pattern-by-pattern and populate `levelOfReclaim` only where proven;
-3. integrate normalized signal/lifecycle metadata into actual core-engine setup objects;
-4. feed those real setup objects into timeframe-domino carrier state;
-5. integrate PMG levels through the production target hierarchy/objective pipeline;
-6. validate lower-to-higher timeframe advancement on real historical charts;
-7. add explicit timeframe/session/anchor metadata to the data model;
-8. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
+3. execute the new schema/adapter harnesses in an available Node/CI environment and repair any failures;
+4. connect PMG levels through the production target hierarchy/objective pipeline;
+5. validate lower-to-higher timeframe advancement on real historical charts;
+6. add explicit timeframe/session/anchor metadata to the data model;
+7. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
 
 The Research Console remains in sample-data mode until the real-market validation and data-semantics layers are materially complete.
