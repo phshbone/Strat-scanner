@@ -1,4 +1,4 @@
-# Engine Validation — v0.11
+# Engine Validation — v0.12
 
 Date: 2026-08-19
 
@@ -17,6 +17,8 @@ Research outcome/scenario layer: **ADDED — 20/20 focused checks pass locally.*
 Real-market 2-2 validation layer: **ADDED.** `tests/real-example-spy-2021-08-2-2.js` validates bullish and bearish SPY daily 2-2 sequences from August 2021, including first-magnitude selection and stop-model/path-resolution differences.
 
 Real-market 2-1-2 validation layer: **ADDED.** `tests/real-example-spy-2021-11-2-1-2.js` validates one bearish and one bullish SPY daily 2-1-2 sequence from November 2021, including first magnitude, midpoint-stop ambiguity, and structure-stop comparison.
+
+Real-market 3-1-2 validation layer: **ADDED.** `tests/real-example-spy-2022-11-3-1-2.js` validates a clean bearish SPY daily 3-1-2 sequence from November 2022. The source OHLC independently confirms Scenario 3 -> inside -> 2D, first magnitude, and that magnitude was reached without either stop being touched on the signal bar.
 
 Real-market validation also includes RM-001 (SPY September 2021 Outside 50 / potential outside month), which passes the stated rule geometry and sequence using consistent historical data.
 
@@ -66,10 +68,30 @@ Magnitude target-stack layer: **ADDED — 11/11 deterministic checks pass locall
 
 These cases reinforce an important backtest rule: coarse daily OHLC must not force an intrabar ordering when both stop and magnitude occur in the same bar.
 
-See:
-- `tests/real-example-spy-2021-08-2-2.js`
-- `tests/real-example-spy-2021-11-2-1-2.js`
-- `tests/REAL-MARKET-VALIDATION.md`
+## Real-market 3-1-2 validation — RM-004
+
+### Bearish SPY daily 3-1-2, November 17 2022
+Using adjusted StatMuse daily OHLC:
+- Nov 14: H 380.89 / L 375.80
+- Nov 15: H 382.92 / L 375.47 => Scenario 3 / outside vs Nov 14
+- Nov 16: H 378.61 / L 375.76 => Scenario 1 / inside vs Nov 15
+- Nov 17: H 375.91 / L 371.33 => 2D vs Nov 16
+
+Engine geometry:
+- setup = bearish `3-1-2`
+- trigger = Nov 16 low 375.76
+- first magnitude = Nov 15 low 375.47
+- midpoint stop = 377.185
+- structure stop = 378.61
+
+Outcome:
+- Nov 17 traded below first magnitude;
+- Nov 17 high remained below both stop levels;
+- midpoint-stop scenario = **WIN**;
+- structure-stop scenario = **WIN**;
+- no lower-timeframe path resolution is needed for this case.
+
+See `tests/real-example-spy-2022-11-3-1-2.js` and `tests/REAL-MARKET-3-1-2.md`.
 
 ## Research scenario infrastructure
 
@@ -158,12 +180,11 @@ These checks validate rule implementation and research accounting. They do **not
 
 ## Next validation work
 
-1. build real historical OHLC fixtures for 3-1-2 and confirm first magnitude;
-2. feed 3-1-2 events through midpoint-stop and structure-stop scenarios;
-3. validate price exhaustion after magnitude completion;
-4. validate multi-timeframe domino sequences;
-5. validate outside-bar sequence resolution with lower-timeframe data;
-6. validate configurable timeframe groups on real charts;
-7. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
+1. validate price exhaustion immediately after setup-defined magnitude completion;
+2. validate promotion from completed magnitude to only structurally valid additional targets;
+3. validate multi-timeframe domino sequences;
+4. validate outside-bar sequence resolution with lower-timeframe data;
+5. validate configurable timeframe groups on real charts;
+6. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
 
 The Research Console remains in sample-data mode until the real-market validation layer is materially complete.
