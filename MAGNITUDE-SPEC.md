@@ -1,62 +1,135 @@
-# Magnitude / Pivot Target Spec v0.2
+# Magnitude / Pivot Target Spec v0.3
 
 ## Purpose
-Magnitude is modeled as a directional stack of prior range/pivot targets. Alex's broadening-formation material gives us a stronger source-backed rule for WHY those pivots matter: higher highs and lower lows create compound outside-bar structure across visible and non-standard/hidden time aggregations.
+Magnitude is the first expected objective produced by a valid Strat setup/reversal through a prior range. Additional unconsumed pivots beyond that first objective are targets.
+
+Alex's broadening-formation teaching gives a source-backed reason these levels matter: higher highs and lower lows create outside/compound-outside structure, and reversals back through prior ranges are measured using the prior candle/range pivots that price has not yet taken.
 
 ## Source-backed broadening rule
-Alex defines broadening formation operationally as price creating higher highs and lower lows. Multiple visible candles may collectively form a `compound outside bar` around an earlier set of candles.
+Broadening formation = higher highs + lower lows.
 
-A broadening formation therefore represents a larger range in which one side of prior ranges may be taken and price can later reverse back through the range toward prior pivots on the opposite side.
+A single Scenario 3 is a one-bar broadening formation. Multiple visible candles may collectively form a `compound outside bar` around earlier candles and may correspond to an outside bar on a higher or differently aggregated timeframe.
 
-Important implications:
-- a single Scenario 3 is an outside bar and therefore a one-bar broadening formation;
-- multiple bars can collectively create the same geometry as an outside bar on a higher or differently anchored timeframe;
-- standard chart boundaries are arbitrary, so 2-day, 2-week, 4-day, etc. aggregation can reveal an outside-bar structure that is only visible as a compound range on the ordinary chart;
-- broadening structure is therefore a magnitude map, not merely a visual trendline pattern.
+Broadening structure is therefore a magnitude map, not merely a visual trendline pattern.
 
-## Deterministic target behavior
+## Pivot definition: raw vs structurally relevant
+Alex explicitly states that a pivot can be the high or low of a previous candle.
+
+For deterministic processing we therefore distinguish:
+
+### Raw candle pivot
+- prior candle high = `HIGH` pivot candidate;
+- prior candle low = `LOW` pivot candidate.
+
+### Structurally relevant pivot
+A raw pivot that lies in the active reversal/continuation path and has not already been taken.
+
+Direction determines which side is relevant:
+- bullish path: prior highs above the active trigger/origin;
+- bearish path: prior lows below the active trigger/origin.
+
+This resolves the earlier ambiguity around `obvious pivots`: every prior candle high/low is a raw pivot candidate, while structure, direction, consumption state, timeframe, and active range determine which pivots matter for the current trade.
+
+## Magnitude vs target terminology
+Alex distinguishes these terms:
+- `magnitude` = the first expected objective for the active setup/range;
+- `target` = additional objective(s) beyond magnitude.
+
+The engine should therefore not call every level in the stack a magnitude.
+
+Recommended fields:
+- `magnitude` = nearest valid unconsumed pivot/range objective tied to the setup;
+- `targets[]` = further valid unconsumed objectives beyond magnitude.
+
+## Setup-specific first magnitude
+Source examples support setup-specific first objectives rather than assuming an unlimited pivot run.
+
+### 2-1-2 bullish
+Entry: break of the inside candle high.
+First magnitude: high of the preceding directional `2D` candle / relevant prior range high.
+
+### 2-1-2 bearish
+Entry: break of the inside candle low.
+First magnitude: low of the preceding directional `2U` candle / relevant prior range low.
+
+### 2-2 reversal
+After one side of the prior range has been taken and the reversal triggers, first magnitude is the opposite relevant prior pivot/range side.
+
+### Failed 2 -> 3 / outside progression
+A 2 must exist before a 3. If price first breaks one side, fails, and comes back through, the opposite side of that candle/range becomes the magnitude objective when sequence is known.
+
+Historical completed `3` bars without lower-timeframe/path information remain directionally ambiguous.
+
+## Range prerequisite
+Do not project through an earlier larger range merely because pivots exist.
+
+Alex gives an important constraint: if the setup has not taken the prerequisite side of the larger range, the first magnitude may be only the opposite side of the immediate setup/inside bar. The engine must not automatically assume that a broader previous candle/range will also be taken.
+
+This means target projection is conditional on the active range geometry, not merely price sorting.
+
+## Deterministic target-stack behavior
 Given:
 - an origin/entry reference price,
 - direction (`BULLISH` or `BEARISH`),
-- a list of validated pivot prices,
+- setup-defined first magnitude,
+- a set of structurally relevant unconsumed pivots,
 
-build a directional target stack:
-- bullish: pivots strictly above origin, nearest first;
-- bearish: pivots strictly below origin, nearest first.
+build the directional path:
+- bullish: relevant pivots strictly above origin, nearest first;
+- bearish: relevant pivots strictly below origin, nearest first.
 
-As price reaches a target, mark it consumed and promote the next remaining pivot.
+The first valid objective is `magnitude`. Any subsequent valid objectives are `targets`.
 
-When no directional targets remain, mark `exhaustionRisk = true`.
+As price reaches an objective, mark it consumed and promote the next remaining pivot.
+
+When the relevant active target structure has been cleared, mark `exhaustionRisk = true`.
 
 ## Reversal-through-range behavior
-When one side of a prior/broadening range has been taken and a valid opposing Strat reversal occurs, the opposite-side prior pivots become magnitude candidates.
+When one side of a prior/broadening range has been taken and a valid opposing Strat reversal occurs, opposite-side pivots become candidate objectives.
 
-Example logic:
-- downside pivots are taken;
-- a valid bullish reversal triggers;
-- bullish magnitude is evaluated through prior overhead pivots/range structure;
-- each consumed pivot is removed from the active stack;
-- the engine does not assume every intermediate pivot MUST be hit.
+Example:
+1. a prior high is taken;
+2. bearish reversal becomes actionable/in force;
+3. nearest relevant prior low is magnitude;
+4. further lower unconsumed pivots are targets;
+5. taking those levels expands/clears the range;
+6. clearing the active structure creates exhaustion risk, not an automatic reversal signal.
 
-The system must distinguish:
-- `candidateMagnitude` — a valid prior pivot/range level in the direction of the reversal;
-- `nextMagnitude` — nearest unconsumed candidate;
-- `consumed` — price has traded through the level;
-- `exhaustionRisk` — no remaining validated directional magnitude in the active structure.
+The bullish case is symmetrical.
+
+## PMG relationship
+A Pivot Machine Gun is a cluster/sequence of nearby unconsumed pivots in the direction of travel.
+
+The current locked behavior is limited to:
+- identify the ordered pivot stack;
+- expose closely spaced pivots as a cluster candidate;
+- do not yet invent a numeric spacing threshold or acceleration probability.
+
+Exact PMG ranking/spacing remains a separate validation task.
 
 ## Right-to-left structural scan
-Alex repeatedly describes drawing/reading the structure from right to left: determine what the current or recent high took out and what the current or recent low took out.
+Alex describes reading/drawing broadening structure from right to left:
+- determine what the recent high took out;
+- determine what the recent low took out;
+- identify the new range extremes;
+- on reversal, trade back through the prior range toward unconsumed pivots.
 
-This gives us a deterministic primitive:
-- for a new high, identify prior highs strictly below that high that have been taken;
-- for a new low, identify prior lows strictly above that low that have been taken.
+This supports deterministic sweep tracking:
+- new high -> mark prior highs below it as swept;
+- new low -> mark prior lows above it as swept.
 
-This DOES NOT by itself decide which of those levels are important/actionable pivots. It only identifies which prior levels were swept by the expanding range.
+## Timeframe continuity interaction
+Magnitude and FTFC are separate concepts.
+
+A valid magnitude may exist without full timeframe continuity, but Alex treats FTFC alignment as increasing the expectation that price can travel through the projected range. Therefore:
+- magnitude validity must not depend on FTFC;
+- FTFC belongs in ranking/confidence/context;
+- conflicting FTFC should not erase an otherwise valid setup or pivot objective.
 
 ## Hidden-timeframe / compound-outside principle
 A compound range on one chart may be an explicit Scenario 3 on a higher or differently anchored timeframe.
 
-For research, store enough data to reproduce this:
+For research, preserve:
 - source timeframe;
 - aggregation span/anchor if non-standard;
 - aggregate high/low;
@@ -64,54 +137,54 @@ For research, store enough data to reproduce this:
 - whether aggregate range is outside the inner range;
 - which prior pivots were swept on each side.
 
-This matters because magnitude may be clearer on the corresponding higher/alternate aggregation even when the standard chart looks noisy.
-
-## Important constraint
-`exhaustionRisk = true` is not a reversal signal. A new opposing actionable Strat setup is still required before a directional flip is considered.
-
-Likewise, broadening structure does not mean price must take every visible pivot. It identifies valid range/pivot objectives; actual progression is determined by price.
-
-## Multi-timeframe behavior
-Pivots may carry timeframe metadata (for example 15m, 60m, D, W, M, 2D, 2W, 4D). The engine may promote from a lower-timeframe pivot to a higher-timeframe pivot as nearer targets are consumed, but it must preserve each pivot's source timeframe and identity.
+## Important constraints
+- `exhaustionRisk = true` is not a reversal signal.
+- broadening does not mean every visible pivot must be hit.
+- additional targets beyond magnitude are possibilities, not guarantees.
+- raw pivots must be filtered by active direction/range/consumption state.
+- a completed Scenario 3 does not reveal which side broke first unless path data is available.
+- order-flow/algo explanations are commentary, not deterministic rules.
 
 ## What is now sufficiently locked
-Source-backed concepts:
 - broadening = higher highs + lower lows;
 - Scenario 3 = one-bar broadening / outside bar;
 - multiple bars can form a compound outside bar;
-- compound structures can correspond to higher/alternate-timeframe outside bars;
-- after one side/range is taken and an actionable reversal occurs, prior pivots on the opposite side are magnitude candidates;
-- consumed pivots promote the next candidate;
-- clearing the relevant directional target stack creates exhaustion risk, not an automatic reversal.
+- prior candle highs/lows are raw pivots;
+- directional unconsumed pivots through the active prior range are structurally relevant;
+- first objective = magnitude; later objectives = targets;
+- setup/range geometry can limit first magnitude to the immediate prior range;
+- after one side is taken and an actionable reversal occurs, the opposite relevant side/pivot is the magnitude candidate;
+- consumed pivots promote subsequent targets;
+- clearing active magnitude/target structure creates exhaustion risk, not automatic reversal;
+- FTFC ranks/qualifies expectation but does not define magnitude validity.
 
-## What is still NOT fully locked
-We still need exact source-backed/empirical rules for automatic pivot qualification:
-- how to distinguish an `obvious swing pivot` from consolidation noise;
-- minimum left/right-bar confirmation, if any;
-- whether different setup families prioritize specific pivots differently;
-- exact PMG acceleration rules;
-- how to rank competing pivots across overlapping timeframe structures.
-
-Until those are validated, the magnitude engine accepts pivots as validated inputs rather than pretending every local high/low is equally meaningful.
+## What is still not fully locked
+- numeric PMG spacing/cluster threshold;
+- exact hierarchy when multiple timeframes provide competing candidate magnitudes at similar prices;
+- whether any setup families beyond the explicitly sourced examples override nearest relevant pivot selection;
+- formal pivot de-duplication when several candles share the same high/low;
+- non-standard timeframe aggregation policy for production scanning.
 
 ## Research fields
 Store at minimum:
 - pivot id
 - pivot price
 - pivot timeframe
-- pivot timestamp if known
+- pivot timestamp
 - pivot type (`HIGH` / `LOW`)
-- source range/structure id
+- raw vs structurally relevant status
+- source candle/range id
 - compound-outside structure id if applicable
 - swept state
-- direction
-- origin price
 - consumed state
-- consumption timestamp if known
+- direction
+- setup id
+- trigger/origin price
+- magnitude flag
 - target order
-- next target
+- consumption timestamp if known
 - remaining target count
 - exhaustion risk
 
 ## Status
-Target-stack mechanics are validated synthetically. Broadening/magnitude relationship is now source-backed from Alex's explanation. Automatic importance-ranking of pivots remains the principal unresolved rule-validation item.
+Broadening, raw pivot definition, first-magnitude terminology, reversal-through-range logic, and setup-limited target projection are now source-backed from Alex's teaching. The remaining work is implementation validation and multi-timeframe/PMG ranking—not basic pivot definition.
