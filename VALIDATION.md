@@ -1,4 +1,4 @@
-# Engine Validation — v0.16
+# Engine Validation — v0.17
 
 Date: 2026-08-19
 
@@ -12,49 +12,78 @@ Date: 2026-08-19
 - Structural target qualification layer: **19/19 PASS** in `tests/target-qualification-validation.js`.
 - Target hierarchy / de-duplication layer: **18/18 PASS** in `tests/target-hierarchy-validation.js`.
 - Integrated multi-timeframe objective pipeline: **20/20 PASS** in `tests/objective-pipeline-validation.js`.
+- Timeframe/domino state layer: **20/20 PASS** in `tests/timeframe-domino-validation.js`.
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Integrated multi-timeframe objective pipeline — new in v0.16
+## Timeframe / domino state — new in v0.17
 
-`objective-pipeline.js` now runs the production objective chain end to end:
+`timeframe-domino.js` adds a timeframe-agnostic state model spanning long-term, swing, and intraday use without changing Strat rules by trading style.
+
+Default supported ladder:
+
+`Y -> Q -> M -> W -> D -> 60 -> 30 -> 15 -> 5`
+
+Yearly and Quarterly are now first-class supported timeframe classes. They are available context and thesis frames, not mandatory filters.
+
+Default convenience profiles:
+- `LONG_TERM`: Y/Q/M/W/D
+- `SWING`: M/W/D/60
+- `SWING_WITH_ENTRY`: M/W/D/60/30/15
+- `INTRADAY`: D/60/30/15/5
+
+Profiles are only presets. Custom timeframe sets remain allowed.
+
+### Domino semantics
+
+A timeframe is active only when its own trigger is actually in force:
+- bullish: current price strictly above trigger;
+- bearish: current price strictly below trigger;
+- equality is not in force.
+
+A lower timeframe becoming actionable does **not** automatically activate a higher timeframe. If price later puts the higher-timeframe setup in force in the same direction, the engine records that higher timeframe as an advancement of the same directional thesis.
+
+This is an observable multi-timeframe state chain, not a claim that one timeframe literally causes another.
+
+The engine preserves separate:
+- `thesisTimeframe`
+- `executionTimeframe`
+- per-timeframe setup/in-force state
+- bullish and bearish active chains when they conflict
+
+Holding duration remains an outcome field rather than redefining the setup.
+
+### Focused validation
+
+`tests/timeframe-domino-validation.js` reports **20/20 PASS locally** and verifies:
+- Yearly/Quarterly/monthly/weekly/daily/intraday aliases and ordering;
+- strict bullish/bearish in-force semantics;
+- Y/Q/M/W/D long-term profile behavior;
+- lower-timeframe activation without falsely activating Quarterly/Daily higher frames;
+- separate thesis and execution timeframe identity;
+- D/60/30/15/5 intraday compatibility;
+- preservation of mixed-direction higher/lower timeframe states.
+
+See:
+- `timeframe-domino.js`
+- `tests/timeframe-domino-validation.js`
+- `TIMEFRAME-DOMINO-SPEC.md`
+
+## Integrated multi-timeframe objective pipeline
+
+`objective-pipeline.js` runs the production objective chain end to end:
 
 `SETUP-DEFINED MAGNITUDE -> STRUCTURAL RANGE QUALIFICATION -> TARGET HIERARCHY / EXACT DE-DUP -> OBJECTIVE STATE -> EXHAUSTION`
 
-The focused integration test covers both a swing-style structure and an intraday structure rather than assuming one fixed timeframe set.
+The focused integration test covers both swing-style and intraday structures rather than assuming one fixed timeframe set.
 
-### Swing-style stack
-Synthetic overlapping structures model a bullish setup inside Daily, Weekly, and Monthly ranges.
-
-Verified behavior:
+Verified behavior includes:
 - setup-defined magnitude remains first until reached;
-- engaged Daily and Weekly ranges qualify;
-- an unengaged Monthly range is excluded even though its boundary is farther in the bullish direction;
-- after magnitude, Daily target comes before Weekly because it is nearer in price;
-- after Daily is consumed, Weekly promotes;
-- after currently qualified Daily/Weekly structure is cleared, exhaustion becomes true;
-- the unengaged Monthly boundary is not silently promoted after exhaustion.
-
-### Exact higher-timeframe agreement
-A Daily and Weekly range resolving to the exact same target price becomes one semantic objective while preserving both timeframe sources.
-
-### Intraday/day-trading stack
-Synthetic bearish structure models 30m, 60m, Daily, and Weekly ranges.
-
-Verified behavior:
-- the same engine works without changing rules;
-- 30m and 60m exact agreement merges into one objective with both sources retained;
-- Daily can remain a later valid extension;
-- an unengaged Weekly range is excluded;
-- after intraday targets are consumed, the Daily target promotes;
-- exhaustion occurs after all currently engaged structures are cleared.
-
-This confirms that the objective engine is timeframe-neutral: `M/W/D/60`, `D/60/30/15`, and other configured groups can use the same deterministic pipeline. Timeframe size alone never grants target priority.
-
-See:
-- `objective-pipeline.js`
-- `tests/objective-pipeline-validation.js`
-- `MULTI-TIMEFRAME-OBJECTIVE-PIPELINE.md`
+- only structurally engaged broader ranges qualify;
+- exact same-price targets can merge while preserving timeframe provenance;
+- target order follows the price path rather than timeframe prestige;
+- unengaged higher-timeframe ranges are not silently promoted;
+- exhaustion occurs after currently qualified structure is cleared.
 
 ## Target hierarchy / de-duplication
 
@@ -115,7 +144,7 @@ Primary outcome states remain:
 - AMBIGUOUS = both occurred but available data cannot establish order;
 - OPEN / UNRESOLVED = no valid resolved result yet.
 
-Scenario grouping can later compare setup, direction, timeframe, FTFC, Minervini state, Elder state, market/sector alignment, exhaustion state, SSS50 involvement, price bucket, stop model, and combinations thereof.
+Scenario grouping can later compare setup, direction, timeframe, FTFC, Minervini state, Elder state, market/sector alignment, exhaustion state, SSS50 involvement, price bucket, stop model, long-term timeframe alignment, and combinations thereof.
 
 Every reported percentage must retain sample size. Exploratory findings must survive out-of-sample validation before being treated as useful evidence.
 
@@ -129,20 +158,23 @@ Every reported percentage must retain sample size. Exploratory findings must sur
 - exact same target price can be merged while preserving source provenance;
 - nearby target prices remain semantically separate unless a caller explicitly requests advisory grouping;
 - timeframe size alone does not override price-path objective order;
-- the objective pipeline supports both swing and intraday timeframe groups;
+- Yearly/Quarterly are supported but never required by default;
+- a lower timeframe cannot falsely activate a higher timeframe;
+- thesis and execution timeframe identity are stored separately;
 - exhaustion is not a reversal signal;
 - these tests validate implementation, not profitability or historical expectancy.
 
 ## Deferred automation note
 
-Adaptive automated trade-management behavior is intentionally not part of the current deterministic research build. The architecture can later keep separate `thesisTimeframe`, `executionTimeframe`, and `managementTimeframe` fields so an automation layer could change management granularity without redefining the original setup. This remains a later execution/automation layer, not current scope.
+Adaptive automated trade-management behavior is intentionally not part of the current deterministic research build. The architecture preserves separate thesis/execution states so a later management/automation layer could change management granularity without redefining the original setup.
 
 ## Next validation/build work
 
-1. implement and validate multi-timeframe domino state where a lower-timeframe setup triggers or advances a higher-timeframe setup;
-2. validate outside-bar sequence resolution with lower-timeframe data;
-3. add explicit timeframe/session anchor metadata to the data model;
-4. validate configurable timeframe groups on real charts;
-5. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
+1. integrate domino state with actual setup objects emitted by the core engine rather than synthetic timeframe states;
+2. validate historical lower-to-higher timeframe advancement on real charts;
+3. validate outside-bar sequence resolution with lower-timeframe data;
+4. add explicit timeframe/session/anchor metadata to the data model;
+5. validate configurable timeframe groups on real charts, including Y/Q/M/W/D long-term groups;
+6. connect a low-cost historical data adapter and begin broader audited scenario backtesting.
 
 The Research Console remains in sample-data mode until the real-market validation and data-semantics layers are materially complete.
