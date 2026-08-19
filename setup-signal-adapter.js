@@ -15,7 +15,8 @@ function finite(v){ return v!==null && v!==undefined && v!=="" && Number.isFinit
   - signal timing metadata is optional and must be supplied by the caller/data layer;
   - setup-defined magnitude is preserved exactly when present;
   - unsupported/no-magnitude setups remain without a magnitude unless an explicit
-    borrowed higher-timeframe objective is supplied by the caller.
+    borrowed higher-timeframe objective is supplied by the caller;
+  - data-construction semantics are carried through unchanged for auditability.
 */
 function setupToSignal(setup,{
   timeframe=null,
@@ -26,6 +27,8 @@ function setupToSignal(setup,{
   reclaimVerified=false,
   borrowedMagnitude=null,
   borrowedMagnitudeTimeframe=null,
+  dataSemantics=null,
+  semanticKey=null,
   metadata=null
 }={}){
   if(!setup || !["BULLISH","BEARISH"].includes(setup.direction)) return null;
@@ -49,6 +52,8 @@ function setupToSignal(setup,{
     reference:setup.reference || null,
     currentType:setup.currentType || null,
     pathResolved:setup.pathResolved!==false,
+    dataSemantics,
+    semanticKey,
     metadata:{
       ...(metadata||{}),
       originalSetup:setup.name || null
@@ -98,6 +103,8 @@ function buildDominoFromSetups({
       currentPrice:Number(currentPrice),
       inForce:state.lifecycle.active,
       setupId:state.signal.setupId,
+      semanticKey:state.signal.semanticKey,
+      dataSemantics:state.signal.dataSemantics,
       signal:state.signal,
       lifecycle:state.lifecycle
     });
