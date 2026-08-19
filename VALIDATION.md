@@ -1,4 +1,4 @@
-# Engine Validation — v0.27
+# Engine Validation — v0.28
 
 Date: 2026-08-19
 
@@ -23,43 +23,73 @@ Date: 2026-08-19
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## Jermaine / Benzinga purist baseline — new in v0.27
+## Rob Smith FinTwit seminar — canonical reinforcement in v0.28
 
-New research note:
+New direct-source research note:
+- `research/ROB-SMITH-FINTWIT-SEMINAR-CANONICAL-NOTES.md`
+
+The user supplied a transcript of a Rob Smith FinTwit seminar. Because this is direct Rob Smith teaching, it has canonical authority over later execution refinements where a true rules conflict appears.
+
+High-confidence canonical confirmations/refinements:
+- Scenario 1 / 2 / 3 definitions are exactly the current engine model;
+- Scenario 3 is necessarily a shorter-timeframe broadening formation;
+- 2-2, 2-1-2, failed-2 -> 3, and 3-1-2 reversal structures are directly described;
+- when one side of a range is taken and the move fails back through, the opposite side is the natural potential-outside magnitude for that source range;
+- canonical default continuity profile is M/W/D/60;
+- signals remain in force while their signal bar remains open, subject to negation;
+- shorter-timeframe signals can reconfirm an already-live higher-timeframe signal;
+- multiple signals can stack across D -> W -> M without a lower timeframe falsely creating higher-timeframe activation;
+- simultaneous break is a breadth/high-probability context rather than setup validity;
+- completed outside/three ranges remain structurally relevant later (`once a three, always a three` concept);
+- new timeframe openings matter mechanically;
+- Rob explicitly warns that 60-minute charts differ depending on bar anchoring/aggregation.
+
+### Critical data-semantics consequence
+
+Bar construction is now treated as a canonical implementation requirement, not a provider cosmetic detail.
+
+Intraday data must preserve:
+- market timezone;
+- session type;
+- regular vs extended-hours inclusion;
+- timeframe;
+- bar anchor / offset;
+- provider aggregation semantics.
+
+Historical validation must compare identical aggregation rules. A 60-minute Strat setup from one provider cannot be assumed equivalent to a differently anchored 60-minute series.
+
+### Simultaneous-break consequence
+
+Future scanner/ranking layer should calculate observable breadth across a defined sector/universe. Do not invent a universal percentage threshold before source verification and historical testing.
+
+### Hybrid-overlay safeguard reinforced
+
+Rob's direct teaching rejects indicators as necessary for pure Strat interpretation. The project therefore keeps strict source separation:
+- Strat = canonical setup/direction/magnitude/timeframe state;
+- Minervini = structural quality/ranking overlay;
+- Elder = trend/momentum/discipline overlay;
+- user plan = risk/behavioral guardrails.
+
+Those overlays may change trade desirability or management, but may not mutate pure Strat validity.
+
+## Jermaine / Benzinga purist baseline
+
+Research note:
 - `research/JERMAINE-BENZINGA-PURIST-BASELINE-NOTES.md`
 
-The user supplied a long early Jermaine / Benzinga interview that is useful as a purist baseline cross-check against Rob Smith's original Strat teaching.
-
-High-confidence baseline observations:
+Important baseline observations remain:
 - three universal truths = actionable signals, timeframe continuity, broadening formations;
-- Scenario 1 = inside bar, Scenario 2 = one-side range break, Scenario 3 = outside bar;
-- Scenario 3 is a lower-timeframe broadening/battleground context and helps define magnitude;
-- hammer goes in force when the next live bar breaks its high;
-- shooter goes in force when the next live bar breaks its low;
-- the actionable break is live; waiting for the triggering bar to close is not required;
-- hammer/shooter morphology is preferred evidence but not required for a valid 2-2 reversal;
-- a forming inside bar is not yet an actionable breakout; after close, its range becomes the equilibrium/reference for the next break;
-- higher-timeframe inside-bar / mother-bar confinement is a chop context and should reduce trade desirability until price exits the range;
-- 2-2, 2-1-2, and 3-1-2 reversals are all explicitly shown;
-- M/W/D/60 is Jermaine's primary profile, not a universal timeframe requirement;
-- Strat reversals are described as fractal and usable on any timeframe;
-- Jermaine's risk style uses small initial size, adds to winners, tight stops, progressive defense, re-entry after failed attempts, and a daily loss limit.
+- forming inside bars are unresolved/no-trade contexts until a valid break;
+- mother-bar confinement is chop context, not automatic setup invalidation;
+- M/W/D/60 is Jermaine's primary profile;
+- small initial size, tight stops, add-to-winners, re-entry, and loss-limit rules are execution/risk preferences rather than universal setup law.
 
-Important source-separation safeguard:
-- exact tight-stop placement and dollar daily-loss examples are Jermaine execution/risk preferences, not universal canonical Strat law;
-- pure Strat validity remains separate from execution preference and hybrid overlays.
+## Carrier-relative interpretation engine
 
-## Carrier-relative interpretation engine — new in v0.27
-
-New module:
+Module:
 - `carrier-interpretation.js`
 
-New focused harness:
-- `tests/carrier-interpretation-validation.js`
-
-Purpose: classify lower-timeframe behavior relative to an already-active higher-timeframe carrier without mutating the canonical setup detector.
-
-States:
+States include:
 - `CONFIRMING`
 - `NEUTRAL_INSIDE`
 - `CONFLICT`
@@ -68,46 +98,16 @@ States:
 - `HIGHER_TF_CHANGE`
 - `MOTHER_BAR_CONFINED`
 - `RANGE_EXIT_CONFIRMING`
-- neutral fallback
 
-Stack-level interpretations:
-- `CONFIRMED`
-- `STABLE`
-- `CAUTION`
-- `REVERSAL_AGAINST`
-- `CHANGED`
-- `NO_ACTIVE_CARRIER`
-
-This formalizes Jermaine's useful continuity language around Control / Confirm / Conflict / Change while preserving the more precise state distinctions developed from the Stat Trading transcript.
-
-Safeguards:
-- an inside bar is neutral until its break resolves direction;
-- ordinary lower-timeframe conflict is not automatically equivalent to higher-timeframe change;
-- an opposing reversal in force is distinct from a merely forming reversal;
-- mother-bar confinement is context/ranking, not setup invalidation;
-- range exit in the carrier direction is confirming evidence;
-- lower timeframes cannot be passed as the carrier itself or a higher timeframe.
-
-The focused harness currently contains 17 checks. It is committed but is **not being reported as PASS-verified** because it has not been executed in this tool session.
+The new Rob transcript further supports keeping ordinary lower-timeframe opposition distinct from actual higher-timeframe negation.
 
 ## Strat Soldier Levels of Reclaim — current conceptual model
 
-The reclaim transcript remains the strongest conceptual source so far for range-relative reclaim.
-
-Operational model:
+Operational model remains:
 
 `PRIOR OUTSIDE / BROADENING RANGE -> RECLAIM BOUNDARY -> RANGE RE-ENTERED -> OPPOSITE SIDE OF PRIOR RANGE -> RANGE COMPLETE / PRICE EXHAUSTION`
 
-Safeguards:
-- reclaim is not midpoint stop;
-- reclaim is not structure stop;
-- reclaim is not automatically the signal candle's open/close;
-- reclaim by itself is not an entry signal;
-- the source prior range/timeframe must be preserved;
-- multiple nested reclaim levels can coexist;
-- actionable signals + continuity remain the participation layer;
-- after a verified reclaim into a prior range, the opposite side becomes the structural objective for that reclaim context;
-- completion of the reclaimed range creates price-exhaustion context, not an automatic reversal prediction.
+The Rob seminar's failed-2/outside-bar discussion further supports preserving the exact source range whenever the opposite boundary is promoted as magnitude.
 
 ## Production paths
 
@@ -127,18 +127,18 @@ Reclaim path:
 
 `PRIOR RANGE / OUTSIDE BAR -> VERIFIED RECLAIM BOUNDARY -> RANGE RE-ENTRY STATE -> OPPOSITE RANGE OBJECTIVE -> MANAGEMENT / GUIDANCE`
 
-Management path:
+Data path requirement (expanded):
 
-`VERIFIED RECLAIM LEVELS -> NEAREST DEFENSIVE RECLAIM -> MANAGEMENT STATE -> GUIDANCE CARD / FUTURE RULE ENGINE`
+`OHLCV + SYMBOL + TIMEFRAME + MARKET TIMEZONE + SESSION + BAR ANCHOR/OFFSET + PROVIDER AGGREGATION`
 
 ## Next validation/build work
 
 1. implement a range-aware reclaim state/schema module;
-2. connect reclaim range completion into the objective/exhaustion layer;
-3. execute the carrier-interpretation/schema/adapter harnesses in Node or CI and repair any failures;
-4. inspect 2-2 / 2-1-2 / 3-1-2 visuals to map reclaim lines to explicit prior ranges;
-5. validate lower-to-higher timeframe carrier advancement/negation on real historical charts;
-6. add explicit timeframe/session/bar-anchor metadata to the data model;
+2. add explicit timeframe/session/bar-anchor metadata to the data model before broader intraday historical validation;
+3. connect reclaim range completion into the objective/exhaustion layer;
+4. execute carrier-interpretation/schema/adapter harnesses in Node or CI and repair failures;
+5. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
+6. implement simultaneous-break breadth as a separate scanner/ranking evidence layer;
 7. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
 8. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
 
