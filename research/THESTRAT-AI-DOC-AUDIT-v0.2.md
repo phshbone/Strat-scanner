@@ -1,4 +1,4 @@
-# TheStrat.ai Documentation Audit v0.2
+# TheStrat.ai Documentation Audit v0.3
 
 Date: 2026-08-19
 
@@ -30,21 +30,21 @@ Important implementation safeguard remains:
 
 Status: current architecture confirmed.
 
-### 2. Signal lifetime / time exhaustion — CONFIRMED, HIGH PRIORITY
+### 2. Signal lifetime / time exhaustion — CONFIRMED, IMPLEMENTED
 
 Current docs state that an actionable signal is tied to the bar in which it exists and expires when that triggering bar closes. Time exhaustion therefore measures remaining bar time, not trend weakness.
 
 Multiple active timeframes can carry the same directional thesis. If one signal expires but another valid higher-timeframe signal remains active, the trade can still have a carrier.
 
-Implementation fields already planned / required:
+Implemented in `signal-lifecycle.js`:
 - `signalStartsAt`
 - `signalExpiresAt`
 - `timeElapsedPct`
 - `timeRemainingPct`
-- `carrierTimeframes[]`
-- signal lifecycle state: standby / active / expired / completed
+- standby / active / expired / completed state
+- `carrierTimeframes[]` helper
 
-Status: deterministic rule is sufficiently clear for implementation; do not invent arbitrary LOW/MEDIUM/HIGH thresholds unless separately specified or researched.
+Status: implemented without arbitrary LOW/MEDIUM/HIGH thresholds.
 
 ### 3. Price exhaustion / magnitude completion — CONFIRMED
 
@@ -54,7 +54,7 @@ Current architecture already exposes `priceExhaustionRisk` separately from time 
 
 Status: confirmed.
 
-### 4. Three-price signal model — CONFIRMED, PARTIALLY MISSING
+### 4. Three-price signal model — CONFIRMED, SCHEMA NOW EXPLICIT
 
 The current docs and Alex cheat-sheet image describe every actionable signal with three key prices:
 1. trigger / signal;
@@ -63,11 +63,17 @@ The current docs and Alex cheat-sheet image describe every actionable signal wit
 
 The engine already stores trigger and magnitude.
 
-`levelOfReclaim` must become a first-class field, but its exact per-pattern calculation must be taken from dedicated current documentation / visuals before hard-coding it. Do not equate it automatically with midpoint stop or structure stop.
+New `signal-schema.js` makes `levelOfReclaim` a first-class field while deliberately leaving it `null` when the exact pattern geometry has not yet been source-verified. It must not be silently replaced with midpoint stop or structure stop.
 
-Status: field required; formula still under audit.
+The schema also records:
+- whether reclaim is known;
+- whether reclaim is source-verified;
+- reclaim provenance;
+- setup vs borrowed magnitude provenance.
 
-### 5. 3-2 — MISSING SETUP, RULE VERIFIED
+Status: schema complete; exact per-pattern reclaim formulas remain under audit.
+
+### 5. 3-2 — RULE VERIFIED; EXPANSION SAFEGUARD LOCKED
 
 Current docs define 3-2 as an outside bar followed directly by a directional 2. It can be reversal or continuation depending on which side of the 3 is broken.
 
@@ -76,18 +82,21 @@ Critical rule:
 - it must borrow a valid higher-timeframe magnitude / objective;
 - therefore a future 3-2 detector must never fabricate a setup-defined target.
 
-Status: missing setup module; safe rule now documented.
+`signal-schema.js` now supports `magnitude = null` plus explicit `borrowedMagnitude` / `borrowedMagnitudeTimeframe`.
+
+Status: detector still missing; target semantics are now safely represented.
 
 ### 6. Kicker — MISSING / LATER
 
-Current docs define a kicker as a gap-plus-reversal pattern. Full-gap trigger is the kicker open; a documented partial-gap variation opens in the top/bottom portion of the setup bar and uses the setup-bar extreme as trigger.
+Current docs define a kicker as a gap-plus-reversal pattern. Full-gap trigger is the kicker open; a documented partial-gap variation opens in the top/bottom 10–20% of the setup bar and uses the setup-bar extreme as trigger.
 
 Important guardrail:
 - kicker is explicitly not a standalone entry;
-- fast lower-timeframe reconfirmation supplies the actual entry/out mechanics;
-- kicker itself does not create its own magnitude; prior-range pivots / broadening structure supply objectives.
+- fast 1/3/5-minute reconfirmation supplies the actual entry/out mechanics;
+- kicker itself does not create its own magnitude;
+- prior-range pivots / broadening structure supply objectives.
 
-Status: deterministic enough to plan, but not a NOW module until the core reversal/LoR lifecycle is hardened.
+Status: deterministic enough to plan, but not a NOW module until core reversal/LoR lifecycle is hardened.
 
 ### 7. PMG — CONFIRMED AS TARGET-FUEL CONCEPT; TERMINOLOGY CONFLICT REMAINS
 
@@ -107,9 +116,17 @@ TheStrat.ai scanner currently supports Daily, Weekly, Monthly, Quarterly, and Ye
 
 Status: current timeframe-agnostic ladder confirmed.
 
+### 9. Broadening / PMG fuel refinement — CONFIRMED
+
+Current exhaustion material states a useful structural preference: reversals moving back through a previous range have existing pivots/stops available as fuel, whereas fresh highs/lows have fewer prior levels to run through. This supports keeping PMG and broader target-stack context as evidence/structure, not as an automatic prediction.
+
+It also reinforces the current rule that after magnitude completes, continuation requires a fresh signal or another active higher-timeframe carrier; the completed lower-timeframe signal cannot justify new size by itself.
+
+Status: architecture confirmed.
+
 ## Architecture consequences from this pass
 
-Production signal object should evolve toward:
+Production signal object now has an explicit normalized representation:
 
 ```text
 setupId
@@ -119,33 +136,32 @@ timeframe
 trigger
 magnitude
 magnitudeSource
+borrowedMagnitude
 borrowedMagnitudeTimeframe
 levelOfReclaim
+reclaimSource
+reclaimVerified
 signalStartsAt
 signalExpiresAt
-inForce
-completed
-expired
-timeElapsedPct
-timeRemainingPct
-priceExhaustionRisk
-carrierTimeframes[]
+reference
+currentType
+pathResolved
+metadata
 ```
 
-Not every setup supplies every field itself. Expansion setups such as 3-2 may have `magnitude = null` at the setup layer and use an explicitly borrowed higher-timeframe objective.
+Lifecycle state remains calculated separately so raw setup identity is not mutated by clock/current-price state.
 
 ## Audit priority from here
 
-1. dedicated Actionable Signals material;
-2. Levels of Reclaim / stop-loss material;
-3. 2-2 reversal visuals and exact signal/reclaim geometry;
-4. 2-1-2 reversal/continuation distinctions;
-5. 3-1-2;
-6. PMG dedicated material;
-7. broadening / price discovery;
-8. hammers and shooters;
-9. take-action window;
-10. remaining expansion/gap setups.
+1. dedicated Levels of Reclaim / stop-loss material;
+2. 2-2 reversal visuals and exact signal/reclaim geometry;
+3. 2-1-2 reversal/continuation distinctions;
+4. 3-1-2;
+5. PMG dedicated material;
+6. broadening / price discovery;
+7. hammers and shooters;
+8. take-action window;
+9. remaining expansion/gap setups.
 
 For each visual page, inspect embedded diagrams/animation when accessible. Request a user-provided screen recording only if sequence cannot be recovered reliably from the page.
 
@@ -162,4 +178,4 @@ For each visual page, inspect embedded diagrams/animation when accessible. Reque
 
 ## Status
 
-The current deterministic architecture remains broadly consistent with the audited current TheStrat.ai material. The largest unresolved foundational item is exact per-signal `levelOfReclaim` geometry. The next code-changing audit step should wait until that rule is verified from the dedicated help material/visuals, while signal-lifetime metadata can be implemented independently because its semantics are already explicit.
+The deterministic architecture remains broadly consistent with current TheStrat.ai documentation. The key unresolved foundational item is still exact per-signal `levelOfReclaim` geometry. The schema now supports that information safely without inventing it, so the next source pass can add verified formulas pattern-by-pattern without changing the object model again.
