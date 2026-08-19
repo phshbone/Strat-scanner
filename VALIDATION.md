@@ -1,4 +1,4 @@
-# Engine Validation — v0.34
+# Engine Validation — v0.35
 
 Date: 2026-08-19
 
@@ -24,23 +24,89 @@ Date: 2026-08-19
 - Core setup -> signal -> lifecycle -> domino adapter: **23/23 PASS locally** in `tests/setup-signal-adapter-validation.js` after correcting one stale test expectation.
 - Carrier-relative interpretation engine: **17/17 PASS locally** in `tests/carrier-interpretation-validation.js`.
 - Data-semantics -> signal provenance integration: **10/10 PASS locally** in `tests/data-semantics-signal-integration-validation.js`.
-- Twelve Data historical-provider adapter harness exists at `tests/twelve-data-adapter-validation.js`; **not yet reported as PASS** in this session because no repository-side completed CI result has been observed and the local execution environment could not fetch repository files.
+- Twelve Data historical-provider adapter harness exists at `tests/twelve-data-adapter-validation.js`; **not yet reported as PASS** in this session because no repository-side completed CI result has been observed.
+- Cloudflare market-data proxy harness exists at `tests/market-data-proxy-validation.mjs`; **not yet reported as PASS** until a completed execution result is observed.
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
+## v0.35 — Cloudflare secret-backed market-data proxy
+
+New production file:
+- `worker/market-data-proxy.mjs`
+
+New specification:
+- `CLOUDFLARE-MARKET-DATA-PROXY-SPEC.md`
+
+New focused harness:
+- `tests/market-data-proxy-validation.mjs`
+
+Updated workflow:
+- `.github/workflows/engine-validation.yml` now executes both `.js` and `.mjs` validation harnesses.
+
+### Production path
+
+`GITHUB PAGES FRONTEND -> CLOUDFLARE WORKER -> TWELVE DATA -> PROVIDER NORMALIZER -> PERIOD/SESSION RESOLVER -> DATA SEMANTICS -> STRAT ENGINE`
+
+### Secret rule
+
+Preferred Worker secret binding:
+- `TWELVE_DATA_API_KEY`
+
+Compatibility fallback:
+- `A12_DATA_KEY`
+
+The Worker reads the API key only from the Cloudflare `env` binding. No provider key is committed to GitHub or returned to the browser.
+
+### Proxy restrictions
+
+The Worker is deliberately narrow rather than a generic HTTP proxy.
+
+Allowed route:
+- `GET /time-series`
+
+Health route:
+- `GET /health`
+
+Allowed provider intervals:
+- `5min`
+- `15min`
+- `30min`
+- `1h`
+- `1day`
+- `1week`
+- `1month`
+
+The Worker validates symbol, interval, output size and optional date inputs before constructing a Twelve Data request. Intraday requests force `timezone=UTC`, and all requests force ascending order.
+
+The browser cannot supply an arbitrary upstream URL or provider endpoint.
+
+### CORS
+
+Production GitHub Pages origin is explicitly allowlisted:
+- `https://phshbone.github.io`
+
+Selected localhost origins are allowed for development. Unknown origins are not reflected dynamically.
+
+### Secret exposure safeguards
+
+- `/health` reports only whether a supported secret binding exists;
+- the constructed provider URL is never returned because it contains the API key;
+- API-key value is never included in error output;
+- unsupported HTTP methods are rejected.
+
 ## v0.34 — historical provider adapter foundation
 
-New production files:
+Production files:
 - `providers/twelve-data.js`
 - `market-data-adapter.js`
 
-New specification:
+Specification:
 - `HISTORICAL-DATA-ADAPTER-SPEC.md`
 
-New focused harness:
+Focused harness:
 - `tests/twelve-data-adapter-validation.js`
 
-### Provider path
+Provider path:
 
 `TWELVE DATA RESPONSE -> PROVIDER NORMALIZER -> PERIOD/SESSION RESOLVER -> DATA SEMANTICS -> STRAT ENGINE`
 
@@ -55,29 +121,9 @@ Initial provider intervals:
 
 Quarterly and yearly bars are not synthesized yet. They should be generated only after explicit calendar/period aggregation semantics are implemented.
 
-### Timestamp rule
-
 Intraday requests explicitly ask Twelve Data for UTC output so returned clock strings can be treated as absolute machine timestamps.
 
-Daily/weekly/monthly responses remain exchange-calendar data and must receive period identity through the resolver layer before they become production-comparable semantic bars.
-
-### API-key safeguard
-
-No provider API key is committed to the repository. The provider adapter accepts a key at runtime.
-
-A browser-hosted PWA cannot make a client-side API key secret. Personal/research usage can accept a runtime key if the user chooses; production/external deployment should put credentials behind a server-side secret boundary.
-
-### Semantic gate
-
-`market-data-adapter.js` refuses to create semantic engine bars without a `periodResolver` that supplies at least:
-- `periodOpenId`
-- `periodOpenTimestamp`
-
-This prevents raw provider OHLC from silently receiving guessed session/period meaning.
-
-### Comparability
-
-The adapter includes a series-semantic comparison helper. Historical series with incompatible timeframe/session/anchor/provider-aggregation/period identity are not to be treated as equivalent evidence.
+`market-data-adapter.js` refuses to create semantic engine bars without a `periodResolver` that supplies at least `periodOpenId` and `periodOpenTimestamp`.
 
 ## v0.33 verification consolidation
 
@@ -87,22 +133,9 @@ Verified locally on 2026-08-19:
 - `tests/carrier-interpretation-validation.js`: **17/17 PASS**;
 - `tests/data-semantics-signal-integration-validation.js`: **10/10 PASS**.
 
-One stale adapter assertion was corrected because only active/in-force carriers count toward domino dominant direction.
-
 Invariant:
 
 `PRESENT SETUP OBJECT != ACTIVE CARRIER`
-
-## Automated validation infrastructure
-
-Workflow:
-- `.github/workflows/engine-validation.yml`
-
-Purpose:
-- run every `tests/*validation*.js` harness on pushes and pull requests;
-- make regressions visible automatically.
-
-Do not report a repository-side PASS unless a completed GitHub Actions run/status is actually observed.
 
 ## Production architecture
 
@@ -124,7 +157,7 @@ Reclaim path:
 
 Data path:
 
-`PROVIDER -> RAW OHLCV -> PROVIDER NORMALIZER -> PERIOD/SESSION RESOLVER -> SEMANTIC BAR -> STRAT ENGINE`
+`GITHUB PAGES -> CLOUDFLARE PROXY -> PROVIDER -> RAW OHLCV -> PROVIDER NORMALIZER -> PERIOD/SESSION RESOLVER -> SEMANTIC BAR -> STRAT ENGINE`
 
 Breadth path planned:
 
@@ -144,12 +177,14 @@ Breadth path planned:
 
 ## Next build work
 
-1. obtain a runtime Twelve Data key and perform the first real provider fetch without committing credentials;
-2. implement the exchange/session period resolver needed to promote provider rows into production semantic bars;
-3. validate known SPY 2-2 / 2-1-2 / 3-1-2 / SSS50 cases against provider data;
-4. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
-5. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including explicit mixed breadth;
-6. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome;
-7. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
+1. deploy `worker/market-data-proxy.mjs` to the Cloudflare Worker that owns the configured Twelve Data secret;
+2. verify `/health` without exposing the secret value;
+3. perform the first real SPY provider fetch through `/time-series`;
+4. implement the exchange/session period resolver needed to promote provider rows into production semantic bars;
+5. validate known SPY 2-2 / 2-1-2 / 3-1-2 / SSS50 cases against provider data;
+6. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
+7. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including explicit mixed breadth;
+8. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome;
+9. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
 
 The Research Console remains in sample-data mode until real-market provider validation and period/session semantics are materially complete.
