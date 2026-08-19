@@ -4,32 +4,32 @@ const {setupToSignal,buildSetupSignalState,buildDominoFromSetups}=require('../se
 let pass=0,fail=0; const failures=[];
 function t(name,actual,expected){const ok=JSON.stringify(actual)===JSON.stringify(expected); if(ok)pass++; else {fail++; failures.push({name,actual,expected});}}
 
-const bullish221Bars=[
-  {open:10,high:12,low:9,close:11},
-  {open:11,high:11.5,low:9.5,close:10},
-  {open:10,high:11,low:9.7,close:10.5},
-  {open:10.5,high:11.6,low:9.8,close:11.4}
+const bullish212Bars=[
+  {open:10,high:12,low:8,close:11},
+  {open:10,high:11,low:7,close:8},
+  {open:8,high:10.5,low:7.5,close:9},
+  {open:9,high:10.8,low:7.7,close:10.6}
 ];
-const setup212=detectSetup(bullish221Bars);
+const setup212=detectSetup(bullish212Bars);
 t('core emits bullish 2-1-2',setup212.name,'2-1-2');
 t('core emits bullish direction',setup212.direction,'BULLISH');
 
 const signal=setupToSignal(setup212,{timeframe:'D',signalStartsAt:1000,signalExpiresAt:2000});
 t('adapter preserves setup id',signal.setupId,'2-1-2');
 t('adapter preserves direction',signal.direction,'BULLISH');
-t('adapter preserves trigger',signal.trigger,11);
-t('adapter preserves magnitude',signal.magnitude,11.5);
+t('adapter preserves trigger',signal.trigger,10.5);
+t('adapter preserves magnitude',signal.magnitude,11);
 t('adapter does not invent reclaim',signal.levelOfReclaim,null);
 t('adapter preserves timeframe',signal.timeframe,'D');
 
-let state=buildSetupSignalState({setup:setup212,currentPrice:11.2,now:1500,signalOptions:{timeframe:'D',signalStartsAt:1000,signalExpiresAt:2000}});
+let state=buildSetupSignalState({setup:setup212,currentPrice:10.7,now:1500,signalOptions:{timeframe:'D',signalStartsAt:1000,signalExpiresAt:2000}});
 t('active core setup becomes active lifecycle',state.lifecycle.status,'ACTIVE');
 t('active core setup trigger in force',state.lifecycle.triggerInForce,true);
 
-state=buildSetupSignalState({setup:setup212,currentPrice:10.9,now:1500,signalOptions:{timeframe:'D',signalStartsAt:1000,signalExpiresAt:2000}});
+state=buildSetupSignalState({setup:setup212,currentPrice:10.4,now:1500,signalOptions:{timeframe:'D',signalStartsAt:1000,signalExpiresAt:2000}});
 t('below bullish trigger is standby',state.lifecycle.status,'STANDBY');
 
-state=buildSetupSignalState({setup:setup212,currentPrice:11.2,now:2000,signalOptions:{timeframe:'D',signalStartsAt:1000,signalExpiresAt:2000}});
+state=buildSetupSignalState({setup:setup212,currentPrice:10.7,now:2000,signalOptions:{timeframe:'D',signalStartsAt:1000,signalExpiresAt:2000}});
 t('bar close expires setup signal',state.lifecycle.status,'EXPIRED');
 
 const bearish22={name:'2-2',direction:'BEARISH',trigger:50,magnitude:45,reference:{high:52,low:48},currentType:'2D',pathResolved:true};
