@@ -1,134 +1,123 @@
-# Engine Validation — v0.13
+# Engine Validation — v0.14
 
 Date: 2026-08-19
 
 ## Current status
 
-Synthetic deterministic layer: **PASS — 44/44 checks in the legacy v0.2 expanded harness.**
+- Legacy synthetic regression layer: **44/44 PASS** in the v0.2 expanded harness. Superseded semantics in that file remain historical only.
+- Corrected core engine: **15/15 PASS** in `tests/core-engine-v0.3-validation.js`.
+- Setup-specific first magnitude: **10/10 PASS** in `tests/setup-magnitude-validation-v0.1.js`.
+- Research outcome/scenario layer: **20/20 PASS** in `tests/research-outcomes-validation.js`.
+- Post-magnitude objective/exhaustion layer: **24/24 PASS** in `tests/magnitude-validation.js`.
+- Structural target qualification layer: **19/19 PASS** in `tests/target-qualification-validation.js`.
+- Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
+- Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-Corrected core-engine layer: **PASS — 15/15 focused checks in `tests/core-engine-v0.3-validation.js`.** This layer removes the old directional Scenario-3 conflation and uses the cleaned `midpointStop` / `magnitude` terminology.
+## Structural target qualification — new in v0.14
 
-Research Console integration layer: **WIRED.** `index.html` loads `core-engine-v0.3.js` as the deterministic source of truth instead of carrying the superseded inline setup engine.
+The upstream qualification layer is now implemented in `target-qualification.js`.
 
-Setup-specific first-magnitude layer: **ADDED — 10/10 focused checks pass locally.** `setup-magnitude.js` isolates the first objective for validated 2-2, 2-1-2, and 3-1-2 setup families from the later generic target stack.
+Purpose: after the setup-defined first magnitude is reached, decide which broader ranges are structurally eligible to become additional targets before passing them into `magnitude.js`.
 
-Research outcome/scenario layer: **ADDED — 20/20 focused checks pass locally.** `research-outcomes.js` classifies magnitude-before-stop outcomes, preserves sequence ambiguity, calculates planned/realized R, summarizes win/loss rates, and compares arbitrary scenario groupings.
+A candidate broader range qualifies only when:
+1. it is valid and active;
+2. it contains the setup/source range;
+3. the required initiating side of that broader range has already been taken;
+4. its opposite boundary extends beyond the setup-defined magnitude.
 
-Real-market validation layers are in place for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
+Direction symmetry:
+- bullish broader target -> broader range `lowTaken === true`, target = broader range high;
+- bearish broader target -> broader range `highTaken === true`, target = broader range low.
 
-Post-magnitude objective/exhaustion layer: **REFINED — 24/24 magnitude checks pass locally.** `magnitude.js` now distinguishes setup-defined magnitude from raw pivots and structurally qualified post-magnitude targets.
+This encodes the sourced restriction that the engine must not project through a larger range merely because a farther pivot exists. If the larger range has not been structurally engaged, it is not promoted.
 
-## Post-magnitude objective state — new in v0.13
+Qualified range boundaries are converted to target objects carrying:
+- `structurallyRelevant: true`
+- `eligibleTarget: true`
+- `source: RANGE_BOUNDARY`
 
-The previous magnitude module could mechanically walk every directional pivot beyond the origin. That behavior is now explicitly separated into a legacy/raw helper and a production objective-state path.
+They feed directly into `magnitude.buildObjectiveState()`.
 
-Production behavior in `buildObjectiveState()`:
-- first objective is always the setup/range-defined `magnitude`;
-- raw directional pivots are not automatically promoted as targets;
-- only pivots explicitly marked structurally relevant / target-eligible by the upstream structure layer may become post-magnitude targets;
+State progression is now:
+
+`SETUP-DEFINED MAGNITUDE -> QUALIFIED BROADER TARGET(S) -> EXHAUSTION FOR CURRENT KNOWN STRUCTURE`
+
+If no broader range qualifies after magnitude is reached, the engine marks exhaustion for the currently known active structure rather than inventing a farther target. A later structural change may qualify a new range and rebuild objective state.
+
+### Focused structural validation
+
+`tests/target-qualification-validation.js` reports **19/19 PASS locally** and verifies:
+- strict broader-range containment;
+- rejection of partial overlap;
+- rejection of an identical range as a broader range;
+- bullish/bearish initiating-side prerequisites;
+- exclusion of inactive and invalid ranges;
+- exclusion when the candidate boundary does not extend past magnitude;
+- nearest eligible boundary ordering;
+- direct integration into `magnitude.js`;
+- target consumption and promotion;
+- no silent promotion of an unengaged higher-timeframe range;
+- exhaustion after all currently-qualified structures are cleared.
+
+See:
+- `target-qualification.js`
+- `tests/target-qualification-validation.js`
+- `TARGET-QUALIFICATION-SPEC.md`
+- `magnitude.js`
+
+## Post-magnitude objective state
+
+`magnitude.js` keeps the setup-defined first objective separate from raw pivots and qualified targets.
+
+Production behavior:
+- first objective is always setup-defined `magnitude`;
+- raw directional pivots are not automatically promoted;
+- only structurally qualified pivots/range boundaries can become post-magnitude targets;
 - after magnitude is reached, the nearest remaining qualified target is promoted;
-- consumed qualified targets are skipped and the next qualified target is promoted;
-- when magnitude has been reached and the currently-qualified target structure is cleared, `exhaustionRisk = true`;
-- if magnitude is reached and no further target has been structurally qualified, the state is exhausted for the currently known active structure;
-- exhaustion remains context only and never creates an automatic reversal.
+- consumed qualified targets are skipped;
+- once magnitude and all currently-qualified targets are cleared, `exhaustionRisk = true`;
+- exhaustion remains context only, never an automatic reversal signal.
 
-This directly prevents the engine from treating every visible prior high/low as a guaranteed next objective.
+## Real-market validation summary
 
-### Focused magnitude validation
-`tests/magnitude-validation.js` now reports **24/24 PASS locally** and covers:
-- raw bullish/bearish directional filtering;
-- legacy target consumption/promotion regression behavior;
-- explicit setup magnitude before later targets;
-- exclusion of unqualified raw pivots;
-- exclusion of wrong-side pivots;
-- bullish and bearish structural-target promotion;
-- consumption of qualified targets;
-- exhaustion only after setup magnitude is reached and active qualified structure is cleared;
-- no automatic promotion of an unqualified raw pivot after magnitude.
+### RM-001 — SPY September 2021 SSS50 / potential outside month
+Validated live-price midpoint semantics, path ordering, and opposite-side target geometry.
 
-See `magnitude.js`, `tests/magnitude-validation.js`, and `MAGNITUDE-SPEC.md` v0.5.
+### RM-002 — SPY August 2021 daily 2-2
+Bullish case resolves WIN under midpoint stop. Bearish case demonstrates daily same-bar ambiguity under midpoint stop and WIN under structure stop.
 
-## Real-market 2-2 validation — RM-002
+### RM-003 — SPY November 2021 daily 2-1-2
+Bearish and bullish examples validate first magnitude. Daily OHLC preserves same-bar midpoint-stop ambiguity; structure-stop scenarios resolve WIN.
 
-### Bullish SPY daily 2-2, August 20 2021
-- trigger = Aug 19 high 412.29
-- first magnitude = Aug 18 high 415.55
-- midpoint stop = 409.945
-- magnitude reached Aug 23 before midpoint stop => **WIN**.
+### RM-004 — SPY November 2022 daily 3-1-2
+Clean bearish 3-1-2 validates trigger, first magnitude, and WIN under both midpoint and structure stop models without path ambiguity.
 
-### Bearish SPY daily 2-2, August 26 2021
-- trigger = Aug 25 low 418.49
-- first magnitude = Aug 24 low 418.16
-- midpoint stop = 419.28
-- structure stop = 420.07
-- Aug 26 traded through both magnitude and midpoint stop in the same daily bar => midpoint-stop scenario **AMBIGUOUS**;
-- structure stop was not reached => structure-stop scenario **WIN**.
+## Historical research accounting
 
-## Real-market 2-1-2 validation — RM-003
-
-### Bearish SPY daily 2-1-2, November 9 2021
-- trigger = Nov 8 low 438.99
-- first magnitude = Nov 5 low 437.78
-- midpoint-stop result from daily OHLC = **AMBIGUOUS**;
-- structure-stop result = **WIN**.
-
-### Bullish SPY daily 2-1-2, November 12 2021
-- trigger = Nov 11 high 436.26
-- first magnitude = Nov 10 high 438.22
-- midpoint-stop result from daily OHLC = **AMBIGUOUS**;
-- structure-stop result = **WIN**.
-
-## Real-market 3-1-2 validation — RM-004
-
-### Bearish SPY daily 3-1-2, November 17 2022
-- Nov 15 = Scenario 3 / outside
-- Nov 16 = inside
-- Nov 17 = 2D
-- trigger = 375.76
-- first magnitude = 375.47
-- midpoint stop = 377.185
-- structure stop = 378.61
-- magnitude reached with neither stop touched => **WIN under both stop models**.
-
-## Research scenario infrastructure
-
-Primary historical outcome:
-- WIN = magnitude reached before stop;
-- LOSS = stop reached before magnitude;
+Primary outcome states remain:
+- WIN = magnitude before stop;
+- LOSS = stop before magnitude;
 - AMBIGUOUS = both occurred but available data cannot establish order;
-- OPEN/UNRESOLVED = no valid resolved result yet.
+- OPEN / UNRESOLVED = no valid resolved result yet.
 
-The scenario comparison engine can group preserved events by setup, direction, timeframe, FTFC, Minervini state, Elder state, market/sector alignment, exhaustion state, SSS50 involvement/entry mode, price bucket, stop model, and later combinations of those fields.
+Scenario grouping can later compare setup, direction, timeframe, FTFC, Minervini state, Elder state, market/sector alignment, exhaustion state, SSS50 involvement, price bucket, stop model, and combinations thereof.
 
-Every percentage must retain its sample size. Exploratory combinations are not promoted until they survive out-of-sample validation.
+Every reported percentage must retain sample size. Exploratory findings must survive out-of-sample validation before being treated as useful evidence.
 
-## Core correction: completed Scenario 3 is path-ambiguous
+## Core safeguards still active
 
-Correct behavior in `core-engine-v0.3.js`:
-- a completed `3` proves both sides of the prior range traded;
-- completed OHLC does not prove which side traded first;
-- a `3` is not automatically classified as bullish or bearish reversal continuation;
-- if lower-timeframe/tick path proves sequence, the caller may pass `currentBarPathDirection`;
-- otherwise the engine returns `OUTSIDE PATH AMBIGUOUS` / `UNKNOWN`.
-
-## Outside 50 correction
-
-Outside 50 confirmation is a LIVE-PRICE / intrabar condition, not a candle-close confirmation.
-
-## Magnitude terminology
-
-- `magnitude` = first expected objective tied to the active setup/range;
-- `targets` = further structurally qualified objectives beyond magnitude;
-- `midpointStop` = optional management midpoint stop; do not confuse it with SSS50.
-
-## Scope note
-
-These checks validate rule implementation and research accounting. They do **not** establish profitability, expectancy, or a historical win rate.
+- completed Scenario 3 remains path-ambiguous unless lower-timeframe/tick sequence resolves direction;
+- SSS50 midpoint confirmation is intrabar/live-price based, not close-confirmation based;
+- magnitude = setup-defined first objective;
+- targets = further structurally qualified objectives;
+- raw pivots are not guaranteed targets;
+- exhaustion is not a reversal signal;
+- these tests validate implementation, not profitability or historical expectancy.
 
 ## Next validation/build work
 
-1. build the upstream structural-qualification layer that decides which broader pivots/ranges are eligible after magnitude;
-2. validate competing higher-timeframe target hierarchy;
+1. validate competing higher-timeframe target hierarchy when multiple qualified ranges overlap or share near-identical boundaries;
+2. add deterministic target de-duplication rules for same/near-same levels across timeframes;
 3. validate multi-timeframe domino sequences;
 4. validate outside-bar sequence resolution with lower-timeframe data;
 5. add explicit timeframe/session anchor metadata to the data model;
