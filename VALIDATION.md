@@ -1,4 +1,4 @@
-# Engine Validation — v0.33
+# Engine Validation — v0.34
 
 Date: 2026-08-19
 
@@ -24,12 +24,62 @@ Date: 2026-08-19
 - Core setup -> signal -> lifecycle -> domino adapter: **23/23 PASS locally** in `tests/setup-signal-adapter-validation.js` after correcting one stale test expectation.
 - Carrier-relative interpretation engine: **17/17 PASS locally** in `tests/carrier-interpretation-validation.js`.
 - Data-semantics -> signal provenance integration: **10/10 PASS locally** in `tests/data-semantics-signal-integration-validation.js`.
+- Twelve Data historical-provider adapter harness exists at `tests/twelve-data-adapter-validation.js`; **not yet reported as PASS** in this session because no repository-side completed CI result has been observed and the local execution environment could not fetch repository files.
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
 
-## v0.33 verification consolidation
+## v0.34 — historical provider adapter foundation
 
-The previously unexecuted focused harnesses were run together against the current committed module logic.
+New production files:
+- `providers/twelve-data.js`
+- `market-data-adapter.js`
+
+New specification:
+- `HISTORICAL-DATA-ADAPTER-SPEC.md`
+
+New focused harness:
+- `tests/twelve-data-adapter-validation.js`
+
+### Provider path
+
+`TWELVE DATA RESPONSE -> PROVIDER NORMALIZER -> PERIOD/SESSION RESOLVER -> DATA SEMANTICS -> STRAT ENGINE`
+
+Initial provider intervals:
+- 5 minute
+- 15 minute
+- 30 minute
+- 60 minute / 1 hour
+- Daily
+- Weekly
+- Monthly
+
+Quarterly and yearly bars are not synthesized yet. They should be generated only after explicit calendar/period aggregation semantics are implemented.
+
+### Timestamp rule
+
+Intraday requests explicitly ask Twelve Data for UTC output so returned clock strings can be treated as absolute machine timestamps.
+
+Daily/weekly/monthly responses remain exchange-calendar data and must receive period identity through the resolver layer before they become production-comparable semantic bars.
+
+### API-key safeguard
+
+No provider API key is committed to the repository. The provider adapter accepts a key at runtime.
+
+A browser-hosted PWA cannot make a client-side API key secret. Personal/research usage can accept a runtime key if the user chooses; production/external deployment should put credentials behind a server-side secret boundary.
+
+### Semantic gate
+
+`market-data-adapter.js` refuses to create semantic engine bars without a `periodResolver` that supplies at least:
+- `periodOpenId`
+- `periodOpenTimestamp`
+
+This prevents raw provider OHLC from silently receiving guessed session/period meaning.
+
+### Comparability
+
+The adapter includes a series-semantic comparison helper. Historical series with incompatible timeframe/session/anchor/provider-aggregation/period identity are not to be treated as equivalent evidence.
+
+## v0.33 verification consolidation
 
 Verified locally on 2026-08-19:
 - `tests/signal-schema-validation.js`: **20/20 PASS**;
@@ -37,32 +87,24 @@ Verified locally on 2026-08-19:
 - `tests/carrier-interpretation-validation.js`: **17/17 PASS**;
 - `tests/data-semantics-signal-integration-validation.js`: **10/10 PASS**.
 
-### Adapter test correction
+One stale adapter assertion was corrected because only active/in-force carriers count toward domino dominant direction.
 
-One stale assertion in `tests/setup-signal-adapter-validation.js` expected a `MIXED` dominant direction when:
-- the 60-minute bearish signal was active/in force;
-- the Daily bullish setup object was present but below trigger and therefore inactive.
-
-The production domino engine correctly returned `BEARISH` because dominant direction is computed from **active/in-force carriers only**. The test was corrected rather than changing production logic.
-
-This reinforces an important invariant:
+Invariant:
 
 `PRESENT SETUP OBJECT != ACTIVE CARRIER`
 
-An opposing setup that is not in force remains observable context but does not become an active directional carrier.
-
 ## Automated validation infrastructure
 
-New workflow:
+Workflow:
 - `.github/workflows/engine-validation.yml`
 
 Purpose:
 - run every `tests/*validation*.js` harness on pushes and pull requests;
-- make future regressions visible automatically instead of relying only on one-off local execution.
+- make regressions visible automatically.
 
-The workflow file is committed. A repository-side workflow result is not being reported here unless GitHub exposes a completed run/status; local focused verification above is the current execution evidence.
+Do not report a repository-side PASS unless a completed GitHub Actions run/status is actually observed.
 
-## Production architecture now validated through the current deterministic stack
+## Production architecture
 
 Signal path:
 
@@ -82,7 +124,7 @@ Reclaim path:
 
 Data path:
 
-`RAW PROVIDER BAR -> OHLCV + SYMBOL + TIMEFRAME + MARKET TIMEZONE + SESSION + BAR ANCHOR/OFFSET + PROVIDER AGGREGATION + PERIOD OPEN IDENTITY -> STRAT ENGINE`
+`PROVIDER -> RAW OHLCV -> PROVIDER NORMALIZER -> PERIOD/SESSION RESOLVER -> SEMANTIC BAR -> STRAT ENGINE`
 
 Breadth path planned:
 
@@ -102,10 +144,12 @@ Breadth path planned:
 
 ## Next build work
 
-1. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
-2. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including an explicit mixed-breadth state;
-3. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome rather than forcing a trade suggestion;
-4. connect a low-cost historical data adapter and begin broader audited scenario backtesting;
-5. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
+1. obtain a runtime Twelve Data key and perform the first real provider fetch without committing credentials;
+2. implement the exchange/session period resolver needed to promote provider rows into production semantic bars;
+3. validate known SPY 2-2 / 2-1-2 / 3-1-2 / SSS50 cases against provider data;
+4. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
+5. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including explicit mixed breadth;
+6. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome;
+7. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
 
-The Research Console remains in sample-data mode until real-market validation and data-provider semantics are materially complete.
+The Research Console remains in sample-data mode until real-market provider validation and period/session semantics are materially complete.
