@@ -1,14 +1,14 @@
-# TheStrat.ai Documentation Audit v0.5
+# TheStrat.ai Documentation Audit v0.6
 
 Date: 2026-08-19
 
 ## Purpose
 
-Systematically cross-check the deterministic Trading System against current TheStrat.ai education/help material. TheStrat.ai is treated as a high-value operational source from Sara Strat Sniper / Alex's Options and TheStrat LLC, while Rob Smith remains the canonical authority if a conflict appears.
+Systematically cross-check the deterministic Trading System against current TheStrat.ai education/help material and high-value Strat educator material. TheStrat.ai is treated as a high-value operational source from Sara Strat Sniper / Alex's Options and TheStrat LLC, while Rob Smith remains the canonical authority if a conflict appears.
 
 Audit method:
 
-`DOC / VISUAL -> OBSERVABLE RULE -> ENGINE COMPARISON -> CONFIRM / REFINE / MISSING / CONFLICT -> TEST BEFORE MERGE`
+`DOC / VISUAL / TRANSCRIPT -> OBSERVABLE RULE -> ENGINE COMPARISON -> CONFIRM / REFINE / MISSING / CONFLICT -> TEST BEFORE MERGE`
 
 Animations and diagrams are valid audit evidence for price sequence and geometry. If a specific embedded animation cannot be inspected reliably, request only that clip from the user rather than the full library.
 
@@ -42,50 +42,56 @@ Current material explicitly describes:
 
 `signal-schema.js` represents all three while allowing reclaim to remain unknown.
 
-## Level of Reclaim audit — refined in v0.5
+## Level of Reclaim audit — materially refined in v0.6
 
-Current indexed material confirms the management role of reclaim more clearly than its per-pattern derivation.
+A user-supplied Strat Soldier / Jermaine transcript materially resolves the main conceptual ambiguity around Levels of Reclaim. Jermaine states that the concept comes from Rob Smith's original 2018 course and explains that reclaim levels are used to represent re-entry into prior outside-bar / broadening ranges without drawing a dense web of diagonal broadening lines.
 
-Confirmed:
-- when time exhaustion rises, the level of defense can be tightened;
-- after magnitude, defense can be tightened to the nearest valid Level of Reclaim;
-- once price is back inside a previous range, reclaim levels become active structural references;
-- a completed signal cannot justify fresh size by itself unless another active carrier is taking over;
-- trigger, magnitude, and reclaim are distinct prices.
+The most important conclusion is that Level of Reclaim is best modeled as **range-relative structural geometry**, not as one universal setup-only formula.
 
-Still not source-verified pattern-by-pattern:
-- exact 2-2 reclaim price;
-- exact 2-1-2 reclaim price;
-- exact 3-1-2 reclaim price;
-- exact hammer/shooter reclaim price;
-- whether reclaim geometry changes by variation/context.
+Confirmed from the transcript and current docs:
+- price can reclaim back into a prior Scenario 3 / outside-bar / broadening range;
+- once that prior range is re-entered, the opposite side of that range becomes the active structural objective;
+- multiple reclaim levels can exist across nested/fractal prior ranges;
+- actionable signals and timeframe continuity still control participation; a reclaim line by itself is not an entry signal;
+- hitting the opposite side completes that reclaimed range and creates price-exhaustion context;
+- reclaim is not synonymous with midpoint stop or structure stop;
+- reclaim provenance must preserve the prior range/timeframe that created the level.
 
-Implementation consequence:
-- `levelOfReclaim` remains `null` unless explicitly source-verified;
-- midpoint stop is not substituted;
-- structure stop is not substituted;
-- inferred pivots are not silently promoted to reclaim.
+This means the prior audit question, "what is the universal reclaim formula for 2-2 / 2-1-2 / 3-1-2?", was likely framed too narrowly. The safer production model is:
 
-### Reclaim management layer — new in v0.5
+`PRIOR RANGE / OUTSIDE BAR -> RECLAIM BOUNDARY -> RANGE RE-ENTERED -> OPPOSITE RANGE BOUNDARY / MAGNITUDE`
 
-Added `reclaim-management.js` to handle verified reclaim levels without pretending to know their unsourced origin.
+Exact reclaim prices still must be extracted from the relevant source range geometry, but the engine no longer needs to wait for one universal formula that may not exist.
 
-Deterministic rule:
-- bullish position -> nearest defensive reclaim = highest verified reclaim below current price;
-- bearish position -> nearest defensive reclaim = lowest verified reclaim above current price;
-- equality at the selected reclaim counts as a breach;
-- unverified reclaim candidates cannot drive management guidance.
+### Required range-aware reclaim object
 
-After magnitude, with no higher-timeframe carrier active, the management state can emit `TIGHTEN_TO_NEAREST_RECLAIM` when a verified defensive level exists.
+Planned / recommended fields:
 
-This is a selection/management rule, not a reclaim-generation formula.
+```text
+reclaimId
+sourceRangeId
+sourceTimeframe
+reclaimPrice
+direction
+rangeHigh
+rangeLow
+oppositeBoundary
+verified
+source
+consumed
+failed
+```
 
-See:
-- `reclaim-management.js`
-- `tests/reclaim-management-validation.js`
-- `RECLAIM-MANAGEMENT-SPEC.md`
+Potential structural states:
+- `RANGE_RECLAIM_PENDING`
+- `RANGE_RECLAIMED`
+- `TRAVERSING_RECLAIMED_RANGE`
+- `RECLAIM_RANGE_TARGET_HIT`
+- `RECLAIM_RANGE_FAILED`
 
-If the dedicated stop-loss / reclaim animation is not recoverable from the site, request only that specific screen recording from the user.
+### Existing reclaim management remains valid
+
+`reclaim-management.js` can continue selecting the nearest verified defensive reclaim. The change is upstream: verified reclaim candidates should increasingly come from explicit prior-range objects rather than from a setup-only formula.
 
 ## 3-2 safeguard
 
@@ -116,9 +122,31 @@ The staircase detector remains based on Sara's directly published scanner geomet
 
 An older setup guide labels `3-1-3` as Pivot Machine Gun. Do not alias that alternate label to `PMG_STAIRCASE` without dedicated current confirmation.
 
-PMG is now connected through `pmg-objective-pipeline.js`:
+PMG is connected through `pmg-objective-pipeline.js`:
 
 `PMG GEOMETRY -> MATCHING REVERSAL IN FORCE -> SETUP MAGNITUDE -> SEQUENTIAL PMG LEVELS -> PRICE EXHAUSTION`
+
+## Carrier / reconfirmation refinement
+
+Recent Stat Trading material plus the Strat Soldier transcript support a cleaner distinction between confirmation and negation across timeframes.
+
+A higher-timeframe thesis can remain intact while lower timeframes print:
+- confirming directional 2s;
+- inside bars that do not reverse against the carrier;
+- fresh lower-timeframe actionable signals that reconfirm the higher-timeframe direction.
+
+A meaningful opposing reversal / reclaim failure is different from ordinary pullback noise.
+
+Carrier-relative states remain appropriate:
+- `CONFIRMING`
+- `NEUTRAL_INSIDE`
+- `OPPOSING_REVERSAL_FORMING`
+- `OPPOSING_REVERSAL_IN_FORCE`
+
+Range-aware reclaim adds another orthogonal state axis:
+- `RANGE_RECLAIM_PENDING`
+- `RANGE_RECLAIMED`
+- `RECLAIM_RANGE_FAILED`
 
 ## Timeframe support
 
@@ -127,6 +155,8 @@ The timeframe-agnostic ladder remains:
 `Y -> Q -> M -> W -> D -> 60 -> 30 -> 15 -> 5`
 
 Q/Y remain supported context, never mandatory universal filters.
+
+Jermaine's personal implementation preference of month -> week -> day/60 reconfirmation should be treated as a configurable strategy profile/evidence rule, not a universal hard filter.
 
 ## Current production paths
 
@@ -138,19 +168,22 @@ Objective path:
 
 `SETUP MAGNITUDE -> STRUCTURAL TARGETS / PMG LEVELS -> TARGET HIERARCHY -> OBJECTIVE STATE -> PRICE EXHAUSTION`
 
-Management path now begins:
+Reclaim path (refined):
+
+`PRIOR RANGE / OUTSIDE BAR -> VERIFIED RECLAIM BOUNDARY -> RANGE RE-ENTRY STATE -> OPPOSITE RANGE OBJECTIVE -> MANAGEMENT / GUIDANCE`
+
+Management path:
 
 `VERIFIED RECLAIM LEVELS -> NEAREST DEFENSIVE RECLAIM -> MANAGEMENT STATE -> GUIDANCE CARD / FUTURE RULE ENGINE`
 
 ## Audit priority from here
 
-1. exact 2-2 reclaim visual/geometry;
-2. exact 2-1-2 reclaim visual/geometry;
-3. exact 3-1-2 reclaim visual/geometry;
-4. hammers and shooters;
-5. take-action window;
-6. dedicated PMG terminology material;
-7. remaining expansion/gap setups.
+1. build range-aware reclaim state/schema from source range objects;
+2. inspect exact 2-2 / 2-1-2 / 3-1-2 visuals to see how their reclaim lines map to prior ranges;
+3. hammers and shooters;
+4. take-action window;
+5. dedicated PMG terminology material;
+6. remaining expansion/gap setups.
 
 ## Do-not-assume list
 
@@ -160,10 +193,11 @@ Management path now begins:
 - Do not treat time exhaustion as momentum weakness.
 - Do not treat lower-timeframe activity as causally activating a higher timeframe.
 - Do not assign 3-2 its own magnitude.
-- Do not invent Level of Reclaim formulas.
+- Do not force Level of Reclaim into one setup-only formula.
+- Do not equate reclaim with midpoint stop or structure stop.
 - Do not allow unverified reclaim candidates to drive management.
 - Do not make Q/Y mandatory alignment filters.
 
 ## Status
 
-The deterministic architecture continues to match the current documentation well. PMG is connected end-to-end to the objective stack, and reclaim management can now consume verified reclaim levels safely. The remaining source gap is exact per-pattern reclaim geometry; once verified, those formulas can feed the existing schema/management layer without redesigning the architecture.
+The largest conceptual Level-of-Reclaim ambiguity is now substantially resolved: reclaim is best treated as a verified structural gateway back into a prior range, with the opposite side of that range becoming the active objective. Exact price derivation still needs source-range geometry, but the architecture no longer depends on discovering one universal reclaim formula.
