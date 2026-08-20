@@ -1,6 +1,6 @@
-# Engine Validation — v0.35
+# Engine Validation — v0.36
 
-Date: 2026-08-19
+Date: 2026-08-20
 
 ## Current status
 
@@ -24,10 +24,71 @@ Date: 2026-08-19
 - Core setup -> signal -> lifecycle -> domino adapter: **23/23 PASS locally** in `tests/setup-signal-adapter-validation.js` after correcting one stale test expectation.
 - Carrier-relative interpretation engine: **17/17 PASS locally** in `tests/carrier-interpretation-validation.js`.
 - Data-semantics -> signal provenance integration: **10/10 PASS locally** in `tests/data-semantics-signal-integration-validation.js`.
+- US equity period resolver: **21/21 PASS locally** in `tests/period-resolver-validation.js`, covering Daily plus 5/15/30-minute regular-session semantics and explicit 60-minute rejection pending provider-anchor verification.
 - Twelve Data historical-provider adapter harness exists at `tests/twelve-data-adapter-validation.js`; **not yet reported as PASS** in this session because no repository-side completed CI result has been observed.
 - Cloudflare market-data proxy harness exists at `tests/market-data-proxy-validation.mjs`; **not yet reported as PASS** until a completed execution result is observed.
 - Real-market validation exists for 2-2, 2-1-2, 3-1-2, and SSS50 examples.
 - Research Console remains wired to `core-engine-v0.3.js` and remains in SAMPLE DATA mode.
+
+## v0.36 — intraday period semantics foundation
+
+Updated production file:
+- `period-resolver.js`
+
+Updated specification:
+- `PERIOD-RESOLVER-SPEC.md`
+
+Updated focused harness:
+- `tests/period-resolver-validation.js`
+
+New live probe:
+- `scripts/probe-spy-intraday-semantics.js`
+- `.github/workflows/intraday-semantics-probe.yml`
+
+### Production-enabled intraday periods
+
+Enabled for U.S. equities / ETFs, `America/New_York`, regular session only:
+- 5 minute
+- 15 minute
+- 30 minute
+
+Rules:
+- provider timestamp is treated as UTC only because the Twelve Data adapter/proxy explicitly requests `timezone=UTC` for intraday data;
+- bars must open inside 09:30-16:00 regular session;
+- bars must align exactly to a 09:30 local anchor;
+- period identity contains symbol, timeframe, calendar date, session, and local bar-open time;
+- bar open/close timestamps are explicit;
+- premarket, after-hours, and misaligned bars are rejected.
+
+### 60-minute safeguard
+
+60-minute production resolution remains intentionally disabled.
+
+Reason: Rob Smith directly noted that 60-minute Strat classifications can differ depending on bar aggregation/anchor convention. The new live probe therefore observes Twelve Data 1h timestamps but does not promote them into production semantic bars until the exact convention is verified and later compared with real-time provider semantics.
+
+### Local validation observed
+
+`tests/period-resolver-validation.js`: **21/21 PASS locally** on 2026-08-20.
+
+Coverage includes:
+- summer/winter DST conversion;
+- Daily identity;
+- 5m 09:30 anchor;
+- 15m slot identity;
+- final normal-session 30m close at 16:00;
+- winter intraday conversion;
+- rejection of misaligned 15m bars;
+- rejection of premarket bars;
+- explicit 60m hold;
+- resolver factory behavior.
+
+### Live intraday probe status
+
+The GitHub workflow now requests SPY 5m / 15m / 30m / 1h bars through the deployed Cloudflare proxy.
+
+For 5/15/30 it records provider metadata and validates returned bars against the resolver. For 1h it records timestamps in observation-only mode.
+
+**Do not report this live probe as PASS until a completed workflow result/log has been directly observed.**
 
 ## v0.35 — Cloudflare secret-backed market-data proxy
 
@@ -177,14 +238,14 @@ Breadth path planned:
 
 ## Next build work
 
-1. deploy `worker/market-data-proxy.mjs` to the Cloudflare Worker that owns the configured Twelve Data secret;
-2. verify `/health` without exposing the secret value;
-3. perform the first real SPY provider fetch through `/time-series`;
-4. implement the exchange/session period resolver needed to promote provider rows into production semantic bars;
-5. validate known SPY 2-2 / 2-1-2 / 3-1-2 / SSS50 cases against provider data;
-6. validate lower-to-higher timeframe carrier advancement/negation on real historical charts using matched aggregation semantics;
+1. observe the real SPY Daily `/time-series` smoke and known-case workflows; do not mark them PASS without direct evidence;
+2. observe the new SPY intraday semantics probe and record actual Twelve Data 5/15/30/1h timestamp behavior;
+3. if 5/15/30 live semantics match, wire those bars through `market-data-adapter.js` into the deterministic engine;
+4. resolve 60-minute aggregation only after the observed provider convention is explicit and comparable with the future real-time feed;
+5. validate lower-to-higher timeframe carrier advancement/negation on matched real historical bars;
+6. build the first small Practice Mode watchlist using validated intraday bars;
 7. implement simultaneous-break breadth as a separate scanner/ranking evidence layer, including explicit mixed breadth;
 8. add `WAIT_NO_ACTIONABLE_SETUP` as a first-class advisory outcome;
-9. keep Minervini, Elder, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
+9. keep Minervini, Elder, historical pattern evidence, and user-plan rules as separate ranking/guardrail layers rather than changing pure Strat validity.
 
 The Research Console remains in sample-data mode until real-market provider validation and period/session semantics are materially complete.
