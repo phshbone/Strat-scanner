@@ -76,22 +76,25 @@ function buildProviderUrl(requestUrl,apiKey){
   return target;
 }
 
-function getApiKey(env){
-  // Preferred permanent name, with compatibility for the alternate name discussed during setup.
-  return env?.TWELVE_DATA_API_KEY || env?.A12_DATA_KEY || null;
+async function getApiKey(env){
+  const binding=env?.TWELVE_DATA_API_KEY;
+  if(binding && typeof binding.get==="function") return await binding.get();
+  if(typeof binding==="string" && binding) return binding;
+  if(typeof env?.A12_DATA_KEY==="string" && env.A12_DATA_KEY) return env.A12_DATA_KEY;
+  return null;
 }
 
 async function handleTimeSeries(request,env){
   const origin=request.headers.get("Origin");
   try{
-    const target=buildProviderUrl(request.url,getApiKey(env));
+    const apiKey=await getApiKey(env);
+    const target=buildProviderUrl(request.url,apiKey);
     const upstream=await fetch(target.toString(),{headers:{"Accept":"application/json"}});
     const text=await upstream.text();
     let payload;
     try{ payload=JSON.parse(text); }
     catch{ return json({status:"error",message:"invalid provider response"},502,origin); }
 
-    // Never echo the provider URL because it contains the server-side API key.
     return json(payload,upstream.ok?200:upstream.status||502,origin);
   }catch(error){
     return json({status:"error",message:error?.message || "request failed"},400,origin);
@@ -107,7 +110,10 @@ export default {
       return new Response(null,{status:204,headers:corsHeaders(origin)});
     }
     if(request.method!=="GET") return json({status:"error",message:"method not allowed"},405,origin);
-    if(url.pathname==="/health") return json({ok:true,provider:"TWELVE_DATA",secretConfigured:!!getApiKey(env)},200,origin);
+    if(url.pathname==="/health"){
+      const apiKey=await getApiKey(env);
+      return json({ok:true,provider:"TWELVE_DATA",secretConfigured:!!apiKey},200,origin);
+    }
     if(url.pathname==="/time-series") return handleTimeSeries(request,env);
     return json({status:"error",message:"not found"},404,origin);
   }
