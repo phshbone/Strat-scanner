@@ -3,6 +3,7 @@
 const p=require("../practice-trade-engine.js");
 let pass=0,fail=0; const failures=[];
 function t(name,actual,expected){const ok=JSON.stringify(actual)===JSON.stringify(expected); if(ok)pass++; else {fail++; failures.push({name,actual,expected});}}
+function near(name,actual,expected,eps=1e-9){const ok=Math.abs(actual-expected)<=eps; if(ok)pass++; else {fail++; failures.push({name,actual,expected});}}
 function throws(name,fn){let ok=false; try{fn();}catch{ok=true;} t(name,ok,true);}
 
 const bull=p.createPracticeTrade({symbol:"SPY",timeframe:"15",direction:"BULL",setupType:"2-1-2U",triggerPrice:100,stopPrice:98,targetPrice:104,createdAt:"2026-08-20T14:00:00Z"});
@@ -15,6 +16,7 @@ t("equality does not trigger",x.state,"ARMED");
 x=p.processBar(x,{datetime:"t2",open:100,high:101,low:99,close:100.5});
 t("strict break triggers",x.state,"OPEN");
 t("entry at trigger",x.entryPrice,100);
+t("initial lot created",x.lots.length,1);
 t("entry event",x.events[0].type,"ENTRY_TRIGGERED");
 
 x=p.processBar(x,{datetime:"t3",open:100.5,high:103,low:99.5,close:102});
@@ -32,6 +34,23 @@ t("bear opens on strict downside break",b.state,"OPEN");
 b=p.processBar(b,{datetime:"b2",open:200,high:203.5,low:198,close:202});
 t("bear stop hit",b.state,"STOPPED");
 t("bear stopped result R",b.resultR,-1);
+
+const scale=p.createPracticeTrade({symbol:"AAPL",timeframe:"15",direction:"BULL",setupType:"2-2U",triggerPrice:100,stopPrice:98,targetPrice:106,quantity:10});
+let s=p.processBar(scale,{datetime:"s1",open:99.5,high:101,low:99,close:100.5});
+s=p.addPracticeShares(s,{quantity:5,price:102,at:"s2",reason:"LOWER_TF_2_2_CONTINUATION",source:"PRACTICE_RULE"});
+t("scale-in lot added",s.lots.length,2);
+t("scale-in count",s.scaleInCount,1);
+t("total quantity after add",s.quantity,15);
+near("weighted average entry",s.averageEntryPrice,(1000+510)/15);
+t("shares-added event",s.events[1].type,"SHARES_ADDED");
+near("risk capital includes both lots",p.totalRiskCapital(s),10*2+5*4);
+s=p.processBar(s,{datetime:"s3",open:103,high:106.5,low:102.5,close:106});
+t("scaled trade target hit",s.state,"TARGET_HIT");
+near("scaled trade pnl",s.pnl,(106-((1000+510)/15))*15);
+near("scaled trade result R",s.resultR,s.pnl/40);
+
+throws("cannot scale an armed trade",()=>p.addPracticeShares(scale,{quantity:1,price:101}));
+throws("cannot add zero shares",()=>p.addPracticeShares(p.processBar(p.createPracticeTrade({symbol:"MSFT",timeframe:"15",direction:"BULL",setupType:"2-2U",triggerPrice:100,stopPrice:99,targetPrice:103}),{datetime:"m1",open:100,high:101,low:99.5,close:100.5}),{quantity:0,price:101}));
 
 const amb=p.createPracticeTrade({symbol:"IWM",timeframe:"15",direction:"BULL",setupType:"2-1-2U",triggerPrice:50,stopPrice:49,targetPrice:52});
 const a=p.processBar(amb,{datetime:"a1",open:49.8,high:52.5,low:48.5,close:51});
@@ -52,9 +71,10 @@ throws("reject invalid bull geometry",()=>p.createPracticeTrade({symbol:"SPY",ti
 throws("reject invalid bear geometry",()=>p.createPracticeTrade({symbol:"SPY",timeframe:"15",direction:"BEAR",setupType:"x",triggerPrice:100,stopPrice:99,targetPrice:95}));
 throws("reject zero quantity",()=>p.createPracticeTrade({symbol:"SPY",timeframe:"15",direction:"BULL",setupType:"x",triggerPrice:100,stopPrice:99,targetPrice:101,quantity:0}));
 
-const summary=p.summarizePracticeTrade(x);
+const summary=p.summarizePracticeTrade(s);
 t("summary state",summary.state,"TARGET_HIT");
-t("summary resultR",summary.resultR,2);
+t("summary quantity",summary.quantity,15);
+t("summary scale-in count",summary.scaleInCount,1);
 
 console.log(JSON.stringify({pass,fail,failures},null,2));
 process.exit(fail?1:0);
