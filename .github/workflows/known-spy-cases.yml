@@ -1,0 +1,24 @@
+name: Known SPY Cases
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/validate-spy-known-cases.js'
+      - '.github/workflows/known-spy-cases.yml'
+
+jobs:
+  validate-known-spy-cases:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate known SPY cases through live provider path
+        run: node scripts/validate-spy-known-cases.js
