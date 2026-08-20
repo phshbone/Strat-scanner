@@ -6,7 +6,19 @@ function t(name,actual,expected){const ok=JSON.stringify(actual)===JSON.stringif
 function throws(name,fn){let ok=false; try{fn();}catch(e){ok=true;} t(name,ok,true);}
 
 const bullSetup={name:"2-1-2U",direction:"BULLISH",trigger:101,magnitude:106,timeframe:"15"};
-const bull=setupToPracticeTrade(bullSetup,{symbol:"SPY",stopPrice:98.5,stopSource:"INSIDE_BAR_LOW",createdAt:"2026-08-20T14:00:00Z"});
+const bull=setupToPracticeTrade(bullSetup,{
+  symbol:"SPY",
+  stopPrice:98.5,
+  stopSource:"INSIDE_BAR_LOW",
+  createdAt:"2026-08-20T14:00:00Z",
+  setupContextOptions:{
+    ftfc:{alignment:"FULL_BULLISH"},
+    indexBreadth:{context:"BULLISH_MAJORITY"},
+    sectorBreadth:{context:"BULLISH_MAJORITY"},
+    minRewardRisk:2,
+    historicalEvidence:{sampleSize:84,t1Rate:0.67}
+  }
+});
 t("bull state armed",bull.state,"ARMED");
 t("bull direction normalized",bull.direction,"BULL");
 t("bull trigger preserved",bull.triggerPrice,101);
@@ -15,12 +27,22 @@ t("bull target source retained",bull.context.targetSource,"SETUP");
 t("bull stop source explicit",bull.context.stopSource,"INSIDE_BAR_LOW");
 t("practice only flag",bull.context.practiceOnly,true);
 t("no broker authority",bull.context.brokerAuthority,false);
+t("setup context attached",!!bull.context.setupContext,true);
+t("setup context keeps bullish direction",bull.context.setupContext.direction,"BULLISH");
+t("setup context FTFC aligned",bull.context.setupContext.evidence.find(x=>x.label==="FTFC").status,"ALIGNED");
+t("setup context breadth aligned",bull.context.setupContext.evidence.find(x=>x.label==="BREADTH").status,"ALIGNED");
+t("setup context sector breadth aligned",bull.context.setupContext.evidence.find(x=>x.label==="SECTOR_BREADTH").status,"ALIGNED");
+t("setup context historical evidence available",bull.context.setupContext.evidence.find(x=>x.label==="HISTORICAL_EVIDENCE").status,"AVAILABLE");
+t("setup context opaque probability stays disabled",bull.context.setupContext.probabilityScore,null);
+t("setup context does not grant breadth setup authority",bull.context.setupContext.safeguards.breadthDoesNotCreateSetup,true);
 
 const bearSetup={name:"2-2D",direction:"BEARISH",trigger:200,magnitude:190,timeframe:"30"};
 const bear=setupToPracticeTrade(bearSetup,{symbol:"QQQ",stopPrice:204,stopSource:"REFERENCE_HIGH",targetPrice:192,targetSource:"TEST_OVERRIDE"});
 t("bear direction normalized",bear.direction,"BEAR");
 t("explicit target overrides magnitude",bear.targetPrice,192);
 t("explicit target source retained",bear.context.targetSource,"TEST_OVERRIDE");
+t("bear setup context attached by default",!!bear.context.setupContext,true);
+t("missing supporting evidence stays non-authoritative",bear.context.setupContext.evidence.find(x=>x.label==="FTFC").status,"UNKNOWN");
 
 const borrowed={name:"3-2D",direction:"BEARISH",trigger:50,magnitude:null,timeframe:"15"};
 const borrowedTrade=setupToPracticeTrade(borrowed,{symbol:"IWM",stopPrice:53,stopSource:"REFERENCE_HIGH",signalOptions:{borrowedMagnitude:44,borrowedMagnitudeTimeframe:"D"}});
