@@ -1,4 +1,4 @@
-# Trade Coach UI Integration — v0.1
+# Trade Coach UI Integration — v0.2
 
 Date: 2026-08-20
 
@@ -18,6 +18,20 @@ The UI must render guidance; it must not invent guidance.
 
 `trade-coach-ui.js` exposes `globalThis.StratTradeCoachUI` and converts a guidance event into a presentation-only view model.
 
+`research-console-wiring.js` now supplies the visible Research Console connection. It:
+
+- loads the Trade Coach engine and presentation adapter in the browser;
+- adds one compact Trade Coach panel to the Monitor view;
+- derives the monitor's current deterministic setup context from the existing engine state;
+- maintains prior/current snapshots;
+- calls `deriveTradeCoachGuidance()` only against those snapshots;
+- preserves the most recent emitted message when later renders contain no new meaningful state change;
+- exposes the existing `Why?` evidence without recalculating it.
+
+The current Research Console already loads `scanner-card.js`, so that file performs a narrowly scoped browser bootstrap for `research-console-wiring.js` only when the page title identifies the Trading Research Console. Node validation and non-console browser surfaces remain unaffected.
+
+This bootstrap is an integration hook, not a second application or a second trading engine.
+
 ## Presentation contract
 
 A visible guidance model contains:
@@ -29,7 +43,7 @@ A visible guidance model contains:
 - compact `why` evidence
 - optional observation timestamp
 
-If `guidance.emit !== true`, the view model is hidden and no new Trade Coach message should be surfaced.
+If `guidance.emit !== true`, no new Trade Coach message replaces the last decision-relevant guidance.
 
 This preserves the core rule:
 
@@ -41,24 +55,23 @@ This preserves the core rule:
 - the UI adapter cannot grant AI authority;
 - the UI adapter does not score confidence;
 - the UI adapter does not decide setup validity;
-- the UI adapter does not recalculate FTFC, breadth, R:R, targets, or historical statistics;
-- Why evidence is passed through from the shared setup-context object.
-
-## Next visible-app connection
-
-The Research Console should load:
-
-1. `trade-coach.js`
-2. `trade-coach-ui.js`
-
-and maintain the prior/current context snapshots needed by `deriveTradeCoachGuidance()`.
-
-The visible panel should show only the most recent emitted decision-relevant message, with a `Why?` expansion. Re-rendering an unchanged state must not create another message.
+- the UI adapter does not recalculate breadth, R:R, targets, or historical statistics;
+- the monitor FTFC alignment supplied to setup context is derived only from current price versus each displayed period open;
+- Why evidence is passed through from the shared setup-context object;
+- a missing setup remains WAIT rather than being manufactured by context.
 
 ## Validation
 
-Focused harness:
+Focused deterministic harnesses:
 
+- `tests/trade-coach-validation.js`
 - `tests/trade-coach-ui-validation.js`
 
-The harness verifies severity mapping, hidden no-change messages, Why evidence preservation, and the inability of presentation data to grant broker or AI authority.
+The final DOM bootstrap is a browser-integration boundary and should receive a visible smoke pass in the deployed Research Console after GitHub Pages serves the latest commit.
+
+## Status
+
+Trade Coach engine: IMPLEMENTED.
+Presentation adapter: IMPLEMENTED.
+Visible Research Console wiring: IMPLEMENTED.
+Browser smoke observation: PENDING.
