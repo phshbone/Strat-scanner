@@ -14,9 +14,10 @@ throws("outputsize 5001 rejected",()=>normalizeOutputsize(5001));
 t("date accepted",safeDate("2026-08-19 09:30:00"),"2026-08-19 09:30:00");
 throws("bad date rejected",()=>safeDate("yesterday"));
 
-t("preferred secret name",getApiKey({TWELVE_DATA_API_KEY:"A",A12_DATA_KEY:"B"}),"A");
-t("alternate secret name supported",getApiKey({A12_DATA_KEY:"B"}),"B");
-t("missing secret null",getApiKey({}),null);
+t("preferred secret name",await getApiKey({TWELVE_DATA_API_KEY:"A",A12_DATA_KEY:"B"}),"A");
+t("alternate secret name supported",await getApiKey({A12_DATA_KEY:"B"}),"B");
+t("missing secret null",await getApiKey({}),null);
+t("secret-store binding supported",await getApiKey({TWELVE_DATA_API_KEY:{get:async()=>"C"}}),"C");
 
 let url=buildProviderUrl("https://worker.example/time-series?symbol=spy&interval=1h&outputsize=250&start_date=2026-08-01&end_date=2026-08-02","SECRET");
 t("provider host",url.origin,"https://api.twelvedata.com");
@@ -36,7 +37,6 @@ const health=await worker.fetch(new Request("https://worker.example/health"),{TW
 const healthJson=await health.json();
 t("health 200",health.status,200);
 t("health reports configured secret",healthJson.secretConfigured,true);
-
 t("health never returns secret",JSON.stringify(healthJson).includes("SECRET"),false);
 
 const missing=await worker.fetch(new Request("https://worker.example/time-series?symbol=SPY&interval=1day"),{});
