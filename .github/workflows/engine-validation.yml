@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -19,9 +23,11 @@ jobs:
           node-version: '22'
 
       - name: Run validation harnesses
+        id: validation
         shell: bash
         run: |
           set -euo pipefail
+          exec > >(tee validation.log) 2>&1
           echo "Running deterministic engine validation harnesses"
           shopt -s nullglob
           files=(tests/*validation*.js tests/*validation*.mjs)
@@ -33,3 +39,41 @@ jobs:
             echo "==> $f"
             node "$f"
           done
+
+      - name: Publish validation receipt
+        if: always() && github.event_name == 'push'
+        uses: actions/github-script@v7
+        env:
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+            const issue_number = 1;
+            const outcome = String(process.env.VALIDATION_OUTCOME || 'unknown').toUpperCase();
+            let log = 'validation.log was not produced';
+            if (fs.existsSync('validation.log')) {
+              log = fs.readFileSync('validation.log', 'utf8');
+            }
+            const max = 12000;
+            if (log.length > max) log = '…(truncated)…\n' + log.slice(-max);
+            const body = [
+              '# Automated Validation Receipt',
+              '',
+              `**Outcome:** ${outcome}`,
+              `**Commit:** \`${context.sha}\``,
+              `**Branch:** \`${context.ref}\``,
+              `**Run:** ${context.runId}`,
+              `**Published:** ${new Date().toISOString()}`,
+              '',
+              'This receipt is written by the Engine Validation workflow so connector clients can verify push-triggered validation without relying on classic commit-status visibility.',
+              '',
+              '```text',
+              log.replace(/```/g, '``\\`'),
+              '```'
+            ].join('\n');
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              body
+            });
