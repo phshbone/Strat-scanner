@@ -42,4 +42,6 @@ function deriveAdvisoryState({signals=[],practiceTrade=null,carrier=null,breadth
   };
 }
 
-if(typeof module!=="undefined") module.exports={ADVISORY,hasActionableSignal,deriveAdvisoryState};
+const advisoryApi={ADVISORY,hasActionableSignal,deriveAdvisoryState};
+if(typeof module!=="undefined" && module.exports) module.exports=advisoryApi;
+if(typeof globalThis!=="undefined") globalThis.StratAdvisoryState=advisoryApi;
