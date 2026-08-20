@@ -25,6 +25,7 @@ const card=buildScannerCard({
 t("symbol normalized",()=>assert.equal(card.symbol,"SPY"));
 t("timeframe retained",()=>assert.equal(card.timeframe,"15"));
 t("setup retained",()=>assert.equal(card.setup,"2-1-2U"));
+t("explicit primary status retained",()=>assert.equal(card.primarySignalStatus,"EXPLICIT"));
 t("actionable state present",()=>assert.equal(card.advisoryState,"WATCH_ACTIONABLE_SETUP"));
 t("actionable true",()=>assert.equal(card.actionable,true));
 t("rr computed",()=>assert.equal(card.rewardRisk,2.5));
@@ -42,14 +43,28 @@ t("context cannot manufacture setup",()=>assert.equal(waitCard.advisoryState,"WA
 t("wait card is not actionable",()=>assert.equal(waitCard.actionable,false));
 t("wait card can still show supporting ftfc",()=>assert.equal(waitCard.ftfc.alignment,"FULL_BULLISH"));
 
+const ambiguousCard=buildScannerCard({
+  symbol:"SPY",timeframe:"15",
+  signals:[
+    {symbol:"SPY",timeframe:"15",direction:"BULLISH",setupId:"2-1-2U",trigger:101,actionable:true},
+    {symbol:"SPY",timeframe:"15",direction:"BEARISH",setupId:"2-2D",trigger:99,actionable:true}
+  ],
+  ftfc:{alignment:"MIXED"}
+});
+t("multiple signals expose ambiguous primary",()=>assert.equal(ambiguousCard.primarySignalStatus,"AMBIGUOUS"));
+t("ambiguous primary is not marked actionable",()=>assert.equal(ambiguousCard.actionable,false));
+t("ambiguous primary does not borrow first setup",()=>assert.equal(ambiguousCard.setup,null));
+t("ambiguous primary does not borrow first trigger",()=>assert.equal(ambiguousCard.trigger,null));
+
 const practiceContext={
-  advisory:{state:"ACTIVE_TRADE_CONTEXT"},direction:"BULLISH",rrGate:{status:"PASS",rr:3},
+  advisory:{state:"ACTIVE_TRADE_CONTEXT"},direction:"BULLISH",signal:{symbol:"QQQ",timeframe:"15",direction:"BULLISH",setupId:"2-2U",trigger:400},primarySignalResolution:{status:"PRACTICE_CONTEXT",candidateCount:0},rrGate:{status:"PASS",rr:3},
   evidence:[{label:"FTFC",status:"ALIGNED",value:"FULL_BULLISH"},{label:"BREADTH",status:"MIXED_OR_UNKNOWN",value:"MIXED"},{label:"SECTOR_BREADTH",status:"ALIGNED",value:"BULLISH_MAJORITY"},{label:"HISTORICAL_EVIDENCE",status:"NOT_AVAILABLE",value:null}],
   why:[{label:"FTFC",status:"ALIGNED",value:"FULL_BULLISH"}],probabilityScore:null
 };
 const practiceCard=buildScannerCard({symbol:"QQQ",timeframe:"15",practiceTrade:{symbol:"QQQ",timeframe:"15",direction:"BULL",setupType:"2-2U",triggerPrice:400,stopPrice:396,targetPrice:412,context:{setupContext:practiceContext}}});
 t("practice card reuses existing setupContext",()=>assert.equal(practiceCard.setupContext,practiceContext));
 t("practice state retained",()=>assert.equal(practiceCard.advisoryState,"ACTIVE_TRADE_CONTEXT"));
+t("practice context primary status retained",()=>assert.equal(practiceCard.primarySignalStatus,"PRACTICE_CONTEXT"));
 
 const ranked=rankScannerCards([
   {...waitCard,symbol:"ZZZ"},
