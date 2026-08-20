@@ -9,9 +9,15 @@ const CONTINUITY=Object.freeze({
   UNKNOWN:"UNKNOWN"
 });
 
-function classifyContinuity({currentPrice,periodOpen}){
-  const p=Number(currentPrice), o=Number(periodOpen);
-  if(!Number.isFinite(p)||!Number.isFinite(o)) return CONTINUITY.UNKNOWN;
+function numericOrNull(value){
+  if(value===null||value===undefined||value==="") return null;
+  const n=Number(value);
+  return Number.isFinite(n)?n:null;
+}
+
+function classifyContinuity({currentPrice,periodOpen}={}){
+  const p=numericOrNull(currentPrice), o=numericOrNull(periodOpen);
+  if(p===null||o===null) return CONTINUITY.UNKNOWN;
   if(p>o) return CONTINUITY.BULLISH;
   if(p<o) return CONTINUITY.BEARISH;
   return CONTINUITY.FLAT;
@@ -21,17 +27,17 @@ function buildContinuityState(row){
   if(!row || typeof row!=="object") return null;
   const timeframe=normalizeTimeframe(row.timeframe);
   if(!timeframe) return null;
-  const currentPrice=Number(row.currentPrice);
-  const periodOpen=Number(row.periodOpen);
+  const currentPrice=numericOrNull(row.currentPrice);
+  const periodOpen=numericOrNull(row.periodOpen);
   const state=classifyContinuity({currentPrice,periodOpen});
-  const distance=Number.isFinite(currentPrice)&&Number.isFinite(periodOpen)?currentPrice-periodOpen:null;
-  const pctFromOpen=Number.isFinite(distance)&&periodOpen!==0?Number(((distance/periodOpen)*100).toFixed(4)):null;
+  const distance=currentPrice!==null&&periodOpen!==null?currentPrice-periodOpen:null;
+  const pctFromOpen=distance!==null&&periodOpen!==0?Number(((distance/periodOpen)*100).toFixed(4)):null;
   return {
     timeframe,
     state,
-    currentPrice:Number.isFinite(currentPrice)?currentPrice:null,
-    periodOpen:Number.isFinite(periodOpen)?periodOpen:null,
-    distanceFromOpen:Number.isFinite(distance)?Number(distance.toFixed(8)):null,
+    currentPrice,
+    periodOpen,
+    distanceFromOpen:distance!==null?Number(distance.toFixed(8)):null,
     pctFromOpen,
     periodOpenTimestamp:row.periodOpenTimestamp||null,
     observedAt:row.observedAt||null,
@@ -80,4 +86,4 @@ function compareContinuity(previous,current){
   };
 }
 
-if(typeof module!=="undefined") module.exports={CONTINUITY,classifyContinuity,buildContinuityState,summarizeContinuity,compareContinuity};
+if(typeof module!=="undefined") module.exports={CONTINUITY,numericOrNull,classifyContinuity,buildContinuityState,summarizeContinuity,compareContinuity};
