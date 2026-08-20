@@ -2,6 +2,7 @@
 
 const {createPracticeTrade}=require("./practice-trade-engine.js");
 const {setupToSignal}=require("./setup-signal-adapter.js");
+const {buildSetupContext}=require("./setup-context.js");
 
 function finite(v){
   return v!==null && v!==undefined && v!=="" && Number.isFinite(Number(v));
@@ -15,6 +16,7 @@ function finite(v){
   - target defaults only to a validated signal magnitude;
   - stop must be supplied explicitly by a named stop rule/source;
   - no arbitrary percent/ATR/inside-bar stop is invented here;
+  - supporting evidence is attached through setup-context and may not create a setup;
   - practice trades are research objects only and carry no broker/execution authority.
 */
 function setupToPracticeTrade(setup,{
@@ -27,6 +29,7 @@ function setupToPracticeTrade(setup,{
   quantity=1,
   createdAt=null,
   signalOptions={},
+  setupContextOptions={},
   context={}
 }={}){
   const signal=setupToSignal(setup,{...signalOptions,timeframe:timeframe || signalOptions.timeframe || setup?.timeframe || null});
@@ -57,6 +60,20 @@ function setupToPracticeTrade(setup,{
   const tf=String(signal.timeframe || timeframe || "").trim().toUpperCase();
   if(!tf) throw new Error("timeframe required");
 
+  const setupContext=buildSetupContext({
+    signals:[signal],
+    primarySignal:signal,
+    carrier:setupContextOptions.carrier||null,
+    ftfc:setupContextOptions.ftfc||null,
+    indexBreadth:setupContextOptions.indexBreadth||null,
+    sectorBreadth:setupContextOptions.sectorBreadth||null,
+    entry:Number(signal.trigger),
+    stop:Number(stopPrice),
+    target,
+    minRewardRisk:setupContextOptions.minRewardRisk,
+    historicalEvidence:setupContextOptions.historicalEvidence||null
+  });
+
   return createPracticeTrade({
     symbol:sym,
     timeframe:tf,
@@ -72,6 +89,7 @@ function setupToPracticeTrade(setup,{
       practiceOnly:true,
       source:"DETERMINISTIC_STRAT_SIGNAL",
       signal,
+      setupContext,
       stopSource:stopRule,
       targetSource:resolvedTargetSource,
       brokerAuthority:false
