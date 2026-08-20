@@ -1,0 +1,29 @@
+name: Intraday Semantics Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/probe-spy-intraday-semantics.js'
+      - 'period-resolver.js'
+      - 'tests/period-resolver-validation.js'
+      - '.github/workflows/intraday-semantics-probe.yml'
+
+jobs:
+  probe-spy-intraday:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate period resolver
+        run: node tests/period-resolver-validation.js
+
+      - name: Probe SPY intraday semantics through Cloudflare
+        run: node scripts/probe-spy-intraday-semantics.js
