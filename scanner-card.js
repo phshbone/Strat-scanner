@@ -69,3 +69,12 @@ function rankScannerCards(cards=[]){
 const scannerCardApi={compactHistoricalEvidence,buildScannerCard,rankScannerCards};
 if(typeof module!=="undefined"&&module.exports) module.exports=scannerCardApi;
 if(typeof globalThis!=="undefined") globalThis.StratScannerCard=scannerCardApi;
+
+// Research Console bootstrap only. The model remains side-effect free in Node and in other browser surfaces.
+if(typeof window!=="undefined"&&typeof document!=="undefined"&&/^Trading Research Console/.test(document.title||"")&&!window.__stratResearchConsoleBootstrapQueued){
+  window.__stratResearchConsoleBootstrapQueued=true;
+  const script=document.createElement("script");
+  script.src="research-console-wiring.js";
+  script.async=true;
+  document.head.appendChild(script);
+}
