@@ -23,16 +23,15 @@ function buildScannerCard({
   entry=null,stop=null,target=null,minRewardRisk=2,historicalEvidence=null,observedAt=null,sector=null,price=null
 }={}){
   if(typeof buildSetupContext!=="function") throw new Error("setup-context dependency unavailable");
-  const sym=normalizeSymbol(symbol||primarySignal?.symbol||practiceTrade?.symbol);
-  if(!sym) throw new Error("symbol required");
-
-  const signal=primarySignal||(Array.isArray(signals)?signals.find(Boolean):null)||practiceTrade?.context?.signal||null;
-  const tf=normalizeTimeframe(timeframe||signal?.timeframe||practiceTrade?.timeframe);
-  if(!tf) throw new Error("timeframe required");
 
   const context=practiceTrade?.context?.setupContext||buildSetupContext({
-    signals,primarySignal:signal,practiceTrade,carrier,ftfc,indexBreadth,sectorBreadth,entry,stop,target,minRewardRisk,historicalEvidence
+    signals,primarySignal,practiceTrade,carrier,ftfc,indexBreadth,sectorBreadth,entry,stop,target,minRewardRisk,historicalEvidence
   });
+  const signal=context?.signal||practiceTrade?.context?.signal||null;
+  const sym=normalizeSymbol(symbol||signal?.symbol||practiceTrade?.symbol);
+  if(!sym) throw new Error("symbol required");
+  const tf=normalizeTimeframe(timeframe||signal?.timeframe||practiceTrade?.timeframe);
+  if(!tf) throw new Error("timeframe required");
 
   const advisoryState=context?.advisory?.state||"WAIT_NO_ACTIONABLE_SETUP";
   const rr=context?.rrGate?.rr??null;
@@ -42,7 +41,8 @@ function buildScannerCard({
     cardType:"SCANNER_SETUP_CONTEXT",
     symbol:sym,timeframe:tf,sector:sector||null,price:finite(price)?Number(price):null,
     direction:context?.direction||null,setup:setupLabel,advisoryState,
-    actionable:advisoryState==="WATCH_ACTIONABLE_SETUP"||advisoryState==="ACTIVE_TRADE_CONTEXT",
+    primarySignalStatus:context?.primarySignalResolution?.status||null,
+    actionable:(advisoryState==="WATCH_ACTIONABLE_SETUP"||advisoryState==="ACTIVE_TRADE_CONTEXT")&&context?.primarySignalResolution?.status!=="AMBIGUOUS",
     trigger:finite(entry)?Number(entry):finite(signal?.trigger)?Number(signal.trigger):finite(signal?.triggerPrice)?Number(signal.triggerPrice):finite(practiceTrade?.triggerPrice)?Number(practiceTrade.triggerPrice):null,
     stop:finite(stop)?Number(stop):finite(practiceTrade?.stopPrice)?Number(practiceTrade.stopPrice):null,
     target:finite(target)?Number(target):finite(practiceTrade?.targetPrice)?Number(practiceTrade.targetPrice):finite(signal?.magnitude)?Number(signal.magnitude):null,
