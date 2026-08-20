@@ -1,7 +1,7 @@
 "use strict";
 
 const assert=require("assert");
-const {normalizeRR,evidenceStatus,buildSetupContext}=require("../setup-context.js");
+const {resolvePrimarySignal,normalizeRR,evidenceStatus,buildSetupContext}=require("../setup-context.js");
 
 let passed=0;
 function test(name,fn){fn();passed+=1;console.log(`PASS ${passed}: ${name}`);}
@@ -21,9 +21,37 @@ test("invalid geometry is unknown",()=>{
   assert.equal(r.valid,false);
 });
 
+test("missing RR values stay unknown instead of becoming zero",()=>{
+  const r=normalizeRR({entry:null,stop:95,target:112,direction:"BULLISH"});
+  assert.equal(r.valid,false); assert.equal(r.rr,null);
+});
+
 test("bullish FTFC aligns",()=>assert.equal(evidenceStatus("BULLISH","FTFC","FULL_BULLISH").status,"ALIGNED"));
 test("opposed FTFC is flagged",()=>assert.equal(evidenceStatus("BULLISH","FTFC","FULL_BEARISH").status,"OPPOSED"));
 test("mixed breadth stays mixed",()=>assert.equal(evidenceStatus("BULLISH","BREADTH","MIXED").status,"MIXED_OR_UNKNOWN"));
+
+test("single signal resolves automatically",()=>{
+  const s={direction:"BULLISH"};
+  const r=resolvePrimarySignal({signals:[s]});
+  assert.equal(r.signal,s); assert.equal(r.status,"ONLY_SIGNAL");
+});
+
+test("multiple signals are not guessed",()=>{
+  const r=resolvePrimarySignal({signals:[{direction:"BULLISH"},{direction:"BEARISH"}]});
+  assert.equal(r.signal,null); assert.equal(r.status,"AMBIGUOUS"); assert.equal(r.candidateCount,2);
+});
+
+test("explicit primary resolves multiple signals",()=>{
+  const a={direction:"BULLISH"},b={direction:"BEARISH"};
+  const r=resolvePrimarySignal({signals:[a,b],primarySignal:b});
+  assert.equal(r.signal,b); assert.equal(r.status,"EXPLICIT");
+});
+
+test("practice context signal takes priority over ambiguous list",()=>{
+  const p={direction:"BULLISH"};
+  const r=resolvePrimarySignal({signals:[{direction:"BULLISH"},{direction:"BEARISH"}],practiceTrade:{context:{signal:p}}});
+  assert.equal(r.signal,p); assert.equal(r.status,"PRACTICE_CONTEXT");
+});
 
 test("no setup remains wait even with strong support",()=>{
   const c=buildSetupContext({signals:[],ftfc:{alignment:"FULL_BULLISH"},indexBreadth:{context:"BULLISH_MAJORITY"}});
@@ -34,6 +62,14 @@ test("no setup remains wait even with strong support",()=>{
 test("actionable signal becomes watch state",()=>{
   const c=buildSetupContext({signals:[{actionable:true,direction:"BULLISH",setup:"2-1-2U"}]});
   assert.equal(c.advisory.state,"WATCH_ACTIONABLE_SETUP");
+});
+
+test("ambiguous primary is exposed rather than guessed",()=>{
+  const c=buildSetupContext({signals:[{actionable:true,direction:"BULLISH",setup:"2-1-2U"},{actionable:true,direction:"BEARISH",setup:"2-2D"}]});
+  assert.equal(c.signal,null);
+  assert.equal(c.primarySignalResolution.status,"AMBIGUOUS");
+  assert.equal(c.evidence.find(x=>x.label==="SETUP").status,"AMBIGUOUS_PRIMARY");
+  assert.equal(c.safeguards.ambiguousPrimarySignalNotGuessed,true);
 });
 
 test("open practice trade takes active context priority",()=>{
