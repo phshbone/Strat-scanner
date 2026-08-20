@@ -1,6 +1,7 @@
 "use strict";
 
-const {deriveAdvisoryState}=require("./advisory-state.js");
+const advisoryModule=(typeof module!=="undefined"&&module.exports)?require("./advisory-state.js"):(globalThis.StratAdvisoryState||{});
+const deriveAdvisoryState=advisoryModule.deriveAdvisoryState;
 
 function validDirection(value){
   const d=String(value||"").toUpperCase();
@@ -34,28 +35,19 @@ function evidenceStatus(direction,label,value){
 }
 
 function buildSetupContext({
-  signals=[],
-  primarySignal=null,
-  practiceTrade=null,
-  carrier=null,
-  ftfc=null,
-  indexBreadth=null,
-  sectorBreadth=null,
-  entry=null,
-  stop=null,
-  target=null,
-  minRewardRisk=2,
-  historicalEvidence=null
+  signals=[],primarySignal=null,practiceTrade=null,carrier=null,ftfc=null,indexBreadth=null,sectorBreadth=null,
+  entry=null,stop=null,target=null,minRewardRisk=2,historicalEvidence=null
 }={}){
+  if(typeof deriveAdvisoryState!=="function") throw new Error("advisory-state dependency unavailable");
   const signal=primarySignal || (Array.isArray(signals)?signals.find(Boolean):null);
   const direction=validDirection(signal?.direction||practiceTrade?.direction);
   const advisory=deriveAdvisoryState({signals,practiceTrade,carrier,breadth:indexBreadth});
-  const rr=normalizeRR({entry:entry??signal?.triggerPrice??practiceTrade?.entryPrice,stop:stop??practiceTrade?.stopPrice,target:target??practiceTrade?.targetPrice,direction});
+  const rr=normalizeRR({entry:entry??signal?.triggerPrice??signal?.trigger??practiceTrade?.entryPrice,stop:stop??practiceTrade?.stopPrice,target:target??practiceTrade?.targetPrice,direction});
   const minRR=Number(minRewardRisk);
   const rrGate=rr.valid?{status:rr.rr>=(Number.isFinite(minRR)?minRR:2)?"PASS":"FAIL",minimum:Number.isFinite(minRR)?minRR:2,...rr}:{status:"UNKNOWN",minimum:Number.isFinite(minRR)?minRR:2,...rr};
 
   const evidence=[
-    {label:"SETUP",status:signal?"PRESENT":"ABSENT",value:signal?.setup||signal?.label||signal?.pattern||null},
+    {label:"SETUP",status:signal?"PRESENT":"ABSENT",value:signal?.setupId||signal?.setupFamily||signal?.setup||signal?.label||signal?.pattern||null},
     evidenceStatus(direction,"FTFC",ftfc?.alignment||null),
     evidenceStatus(direction,"BREADTH",indexBreadth?.context||null),
     {label:"SECTOR_BREADTH",status:evidenceStatus(direction,"BREADTH",sectorBreadth?.context||null).status,value:sectorBreadth?.context||null},
@@ -63,26 +55,13 @@ function buildSetupContext({
     {label:"HISTORICAL_EVIDENCE",status:historicalEvidence?.sampleSize>0?"AVAILABLE":"NOT_AVAILABLE",value:historicalEvidence||null}
   ];
 
-  const why=evidence.map(item=>({
-    ...item,
-    explanatoryOnly:item.label!=="SETUP"&&item.label!=="RISK_REWARD"
-  }));
-
+  const why=evidence.map(item=>({...item,explanatoryOnly:item.label!=="SETUP"&&item.label!=="RISK_REWARD"}));
   return {
-    advisory,
-    direction,
-    signal:signal||null,
-    rrGate,
-    evidence,
-    why,
-    probabilityScore:null,
-    safeguards:{
-      breadthDoesNotCreateSetup:true,
-      ftfcDoesNotCreateSetup:true,
-      historicalEvidenceIsNotForecast:true,
-      opaqueProbabilityDisabled:true
-    }
+    advisory,direction,signal:signal||null,rrGate,evidence,why,probabilityScore:null,
+    safeguards:{breadthDoesNotCreateSetup:true,ftfcDoesNotCreateSetup:true,historicalEvidenceIsNotForecast:true,opaqueProbabilityDisabled:true}
   };
 }
 
-if(typeof module!=="undefined") module.exports={validDirection,normalizeRR,evidenceStatus,buildSetupContext};
+const setupContextApi={validDirection,normalizeRR,evidenceStatus,buildSetupContext};
+if(typeof module!=="undefined"&&module.exports) module.exports=setupContextApi;
+if(typeof globalThis!=="undefined") globalThis.StratSetupContext=setupContextApi;
