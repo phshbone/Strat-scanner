@@ -21,7 +21,6 @@ Each cell displays a count for that candle/state category on the selected timefr
 Implementation implications:
 - Maintain per-timeframe market-wide state counts.
 - Keep raw scenario counts separate from directional breadth percentages.
-- `3G` and `F2D` terminology must be researched before encoding semantics; do not guess.
 - Support market scope selection and user-selectable ticker groups/watchlists.
 
 ### 2. Market Breadth
@@ -130,7 +129,110 @@ Implementation implications:
 - Gappers may be especially useful as premarket context, but gap percentage itself must not alter canonical Strat classification.
 - User-configurable row count is a useful low-friction UI pattern.
 
-## Confirmed design consequences from Batch 1
+## Batch 2 — Setup Help screenshots
+
+### 9. Strat IDs are explicitly documented
+Help page defines:
+- `1` Inside = high <= prior high; low >= prior low
+- `2U` Two Up = higher high; low >= prior low
+- `2D` Two Down = lower low; high <= prior high
+- `3` Outside = higher high; lower low
+
+This exactly matches the current deterministic core classifier.
+
+### 10. C2 / C1 terminology resolved
+Help page states:
+- `C2 = target bar (previous)`
+- `C1 = trigger bar (latest)`
+
+This is important because Alex's scanner vocabulary is not simply `two bars ago / prior / current`. Their setup-filter model is specifically target-vs-trigger oriented.
+
+### 11. Setup filter grammar documented
+Visible setup filters include:
+- `1-1`: C2=1, C1=1
+- `1-2`: C2=1, C1=2U or 2D
+- `1-3`: C2=1, C1=3
+- `2-1`: C2=2U or 2D, C1=1
+- `2-2`: C2=2U or 2D, C1=2U or 2D
+- `3-1`: C2=3, C1=1
+- `3-2`: C2=3, C1=2U or 2D
+- `3-3`: C2=3, C1=3
+
+This confirms the scanner intentionally exposes broad two-bar structural filters, including combinations that should not automatically be treated as canonical reversal setups.
+
+Implementation consequence:
+- Keep `raw candle-sequence filter` separate from `recognized actionable setup`.
+- A user may scan `3-3` or `1-3` without the engine assigning a canonical trade meaning to that combination.
+
+### 12. Color / candle-shape filters documented
+Visible filters:
+- `2d-green`: trigger candle is 2D and green
+- `2d-green-hammer`: trigger candle is a green 2D hammer
+- `2u-red`: trigger candle is 2U and red
+- `2u-red-shooter`: trigger candle is a red 2U shooter
+- `3-green`: outside-bar trigger candle is green
+- `3-red`: outside-bar trigger candle is red
+
+Help text defines:
+- Hammer = long lower shadow with close near the high
+- Shooter = long upper shadow with close near the low
+
+Exact numeric wick/body thresholds are not visible in these screenshots and must not be invented.
+
+### 13. `3G` is now strongly resolved as `3-green`
+The Candle Snapshot row `3G` is highly likely to mean the documented `3-green` filter/state because the help page explicitly names `3-green` as an outside bar whose trigger candle is green.
+
+Status: **high-confidence operational interpretation**, not yet treated as a canonical Strat term.
+
+### 14. `F2D` likely means failed 2-down, but remains unconfirmed
+User suggested `F2D = failed two down`. This is plausible and consistent with Strat vocabulary, and Rob's material explicitly recognizes failed 2 behavior. However, the supplied help screenshots do not visibly define the `F2D` abbreviation.
+
+Status: **probable but not yet confirmed**. Do not hard-code the abbreviation until a direct help/legend/source definition is captured.
+
+### 15. Scanner tiering is explicitly documented
+A visible tier table ranks trigger/target combinations:
+
+Tier 1:
+- 2U red shooter
+- 2D green hammer
+- 1 when C2=1
+- target: any; 1 when C1=1
+- note: highest tier match wins
+
+Tier 2:
+- 2U shooter
+- 2D hammer
+- 2U red
+- 2D green
+- target: any
+
+Tier 3:
+- 2U or 2D
+- target: any
+
+Tier 4:
+- trigger 1 or 3
+- target 1 or 3
+- fallback tier when 1/3 present
+
+Implementation consequence:
+- This tier system is an **Alex/StratAlerts scanner ranking layer**, not canonical Strat validity.
+- If adopted, preserve it as a source-labelled optional ranking profile rather than letting it alter core setup detection.
+- "Highest tier match wins" implies deterministic precedence among overlapping scanner labels.
+
+### 16. Product architecture clues from shortcuts
+Help page shortcuts expose distinct modules:
+- `/` quick symbol search
+- `q` AI Search
+- `a` Alerts
+- `b` Simultaneous Breaks
+- `m` Mission Control
+- `w` Watchlists
+- `s` Setups Table
+
+This confirms Simultaneous Breaks is treated as a first-class product surface, separate from the normal Setup table and Mission Control.
+
+## Confirmed design consequences from Batches 1-2
 
 1. Build scanner statistics from the same deterministic candle-state store used by symbol analysis.
 2. Add a generic aggregation model:
@@ -139,14 +241,20 @@ Implementation implications:
 4. Add a compact multi-timeframe Ticker Matrix alongside the main setup scanner.
 5. Support preset universes, sector groups, and custom watchlists independently.
 6. Keep context modules (economic calendar, news, squawk, sentiment) separate from pure Strat validity.
-7. Do not encode unknown labels or visual states (`3G`, `F2D`, dashed pills) until sourced.
+7. Model raw two-bar sequence filters independently from canonical actionable-setup recognition.
+8. Preserve scanner tiering, color filters, hammer/shooter filters, and `3-green` as source-labelled operational layers.
+9. Treat `3G` as high-confidence `3-green` shorthand.
+10. Keep `F2D` unresolved/probable until direct source confirmation.
+11. Do not infer exact hammer/shooter geometry thresholds from prose alone.
+12. Simultaneous Breaks deserves its own scanner/view rather than merely a column.
 
-## Open questions from Batch 1
+## Open questions after Batch 2
 
-- Exact definition of `3G`.
-- Exact definition of `F2D`.
+- Direct source definition of `F2D`.
 - Meaning of dashed vs solid state-pill border.
+- Exact numeric hammer/shooter qualification rules.
 - Whether percentages are based on all symbols in the group or only symbols with valid/current data.
 - How sector constituent membership is maintained and whether ETFs themselves are included in their groups.
 - Update cadence of Candle Snapshot and Market Breadth.
 - Whether 4H/12H are exchange/session anchored or provider-native clock bars.
+- Exact computation/meaning of the documented tier system in every overlap case beyond `highest tier match wins`.
