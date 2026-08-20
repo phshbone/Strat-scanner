@@ -1,0 +1,29 @@
+name: Live Market Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/live-spy-smoke.js'
+      - 'period-resolver.js'
+      - 'tests/period-resolver-validation.js'
+      - '.github/workflows/live-market-smoke.yml'
+
+jobs:
+  live-spy-daily:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate period resolver
+        run: node tests/period-resolver-validation.js
+
+      - name: Pull live SPY daily through Cloudflare
+        run: node scripts/live-spy-smoke.js
