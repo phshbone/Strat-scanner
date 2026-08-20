@@ -1,4 +1,4 @@
-# Practice Mode — v0.2
+# Practice Mode — v0.3
 
 Date: 2026-08-20
 
@@ -10,7 +10,53 @@ It is intentionally separate from setup validity. A Strat setup may exist withou
 
 ## Initial flow
 
-`WATCHLIST -> LIVE/REPLAY SETUP -> NORMALIZED SIGNAL -> PRACTICE TRADE ARMED -> ENTRY TRIGGER -> OPEN -> TARGET / STOP / AMBIGUOUS -> RESULT LOG`
+`WATCHLIST -> LIVE/REPLAY SETUP -> NORMALIZED SIGNAL -> PRACTICE TRADE ARMED -> ENTRY TRIGGER -> OPEN -> OPTIONAL SCALE-IN(S) -> TARGET / STOP / AMBIGUOUS -> RESULT LOG`
+
+## v0.3 share scale-ins
+
+Implemented in `practice-trade-engine.js` through `addPracticeShares()`.
+
+Practice Mode can now add shares to an already OPEN paper trade so continuation/add-on concepts can be tested independently from the original entry.
+
+Each add records:
+
+- added quantity;
+- explicit fill price;
+- timestamp;
+- reason / rule label;
+- source label;
+- stop in force when that lot was added;
+- updated total quantity;
+- updated weighted-average entry;
+- lot sequence;
+- `SHARES_ADDED` event.
+
+Safeguards:
+
+- shares may only be added while the paper trade is OPEN;
+- no add-on trigger is invented by the trade engine;
+- the caller must identify the add-on reason/rule;
+- a lower-timeframe 2-2 continuation, momentum-bar hold/reclaim, pullback hold, or other add-on concept can be tested later as a separately sourced management rule;
+- scale-ins remain paper-only and have no broker authority;
+- historical results must preserve intrabar ambiguity when OHLC cannot establish whether an add trigger happened before a stop/target.
+
+This deliberately separates:
+
+`ORIGINAL STRAT ENTRY` from `POSITION MANAGEMENT / PYRAMIDING RULE`.
+
+That lets research answer whether adding shares actually improves expectancy, rather than assuming that a familiar continuation pattern should be pyramided.
+
+### Position accounting
+
+The engine now maintains individual lots and computes:
+
+- total quantity;
+- weighted-average entry;
+- P&L at exit;
+- total risk capital based on each lot's fill price, quantity, and stop in force when added;
+- result in R using total position risk capital.
+
+This is preferable to treating every added share as though it had the original entry price/risk.
 
 ## v0.2 setup-to-practice adapter
 
@@ -35,7 +81,7 @@ This establishes the boundary:
 
 A valid setup does not automatically create a trade until an explicit stop/management rule is selected.
 
-## v0.1 trade engine scope
+## Trade engine scope
 
 Implemented in `practice-trade-engine.js`:
 
@@ -44,11 +90,13 @@ Implemented in `practice-trade-engine.js`:
 - exact trigger price;
 - structural stop price;
 - first target / magnitude price;
-- quantity;
+- initial quantity plus later scale-ins;
+- per-lot accounting;
+- weighted-average entry;
 - ARMED -> OPEN -> TARGET_HIT / STOPPED / AMBIGUOUS lifecycle;
 - strict trigger rule: equality alone does not count as in-force;
 - MFE and MAE tracking;
-- result normalized to R;
+- P&L and result normalized to R;
 - event log;
 - coarse-OHLC ambiguity preservation.
 
@@ -62,11 +110,10 @@ Examples:
 
 - a bullish entry trigger and target both lie inside one 15-minute bar;
 - a later bar spans both stop and target;
-- a 3/outside bar crosses multiple execution levels.
+- a 3/outside bar crosses multiple execution levels;
+- a proposed scale-in trigger and stop both occur inside one coarse bar.
 
 Those cases become `AMBIGUOUS` unless a lower-timeframe/tick sequence can establish the order.
-
-This follows the existing project rule that completed OHLC cannot establish path direction when both extremes were traversed.
 
 ## Trigger semantics
 
@@ -97,13 +144,16 @@ The engine only validates that the stop/trigger/target geometry is coherent.
 Current:
 
 - state;
-- entry / exit price;
+- entry / weighted-average entry / exit price;
+- total quantity;
+- scale-in count;
+- P&L;
 - result in R;
 - MFE;
 - MAE;
 - bars observed;
 - bars since entry;
-- event history.
+- event and lot history.
 
 Planned experiment metrics:
 
@@ -117,7 +167,8 @@ Planned experiment metrics:
 - FTFC state;
 - Minervini/Elder overlay state;
 - visual-pattern family / similarity group;
-- entry/management variant ID.
+- entry/management variant ID;
+- add-on rule performance vs identical trades without scale-ins.
 
 ## Experiment architecture
 
@@ -133,6 +184,14 @@ Entry variants:
 - first pullback after trigger;
 - lower-timeframe confirmation;
 - FTFC/sector-confirmed trigger.
+
+Scale-in variants:
+- no add;
+- lower-timeframe 2-2 continuation;
+- pullback that stays outside the prior momentum-bar range;
+- reclaim/hold of a defined structural level;
+- second actionable signal in the same direction;
+- add only after first magnitude/target transition where separately justified.
 
 Management variants:
 - no trail;
@@ -157,17 +216,18 @@ Performance comparison must include sample size and out-of-sample validation. Hi
 
 Practice Mode should eventually surface a compact sequence:
 
-`WHAT IS SETTING UP -> ENTRY RULE -> ARMED -> IN TRADE -> MANAGEMENT -> RESULT`
+`WHAT IS SETTING UP -> ENTRY RULE -> ARMED -> IN TRADE -> ADD? -> MANAGEMENT -> RESULT`
 
-It should be usable on a small cross-sector watchlist while a broader universe is scanned more slowly for research and candidate rotation.
+An add action should show the proposed rule, added shares, new average entry, current stop, resulting total risk, and the comparable historical sample when available.
 
-## Non-goals in v0.2
+## Non-goals in v0.3
 
 - no live broker execution;
 - no automatic order placement;
 - no options position model yet;
+- no automatic pyramiding authority;
 - no trailing-stop optimizer yet;
-- no AI-generated entry/exit authority;
+- no AI-generated entry/add/exit authority;
 - no assumption that a backtested winner is a valid live edge.
 
 ## Validation
@@ -177,4 +237,4 @@ Focused harnesses:
 - `tests/practice-trade-engine-validation.js`
 - `tests/practice-setup-adapter-validation.js`
 
-The harnesses cover strict trigger semantics, bull/bear results, MFE/MAE, stop/target outcomes, invalid geometry, terminal immutability, coarse-bar ambiguity, setup-to-signal mapping, target provenance, explicit stop provenance and broker-authority safeguards.
+The trade harness now also validates lot creation, share additions, weighted-average entry, total risk capital, P&L/R accounting, and rejection of adds to non-open trades.
