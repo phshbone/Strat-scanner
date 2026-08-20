@@ -9,8 +9,16 @@ function test(name,fn){fn();passed+=1;console.log(`PASS ${passed}: ${name}`);}
 test("price above period open is bullish",()=>assert.equal(classifyContinuity({currentPrice:101,periodOpen:100}),CONTINUITY.BULLISH));
 test("price below period open is bearish",()=>assert.equal(classifyContinuity({currentPrice:99,periodOpen:100}),CONTINUITY.BEARISH));
 test("price equal to period open is flat",()=>assert.equal(classifyContinuity({currentPrice:100,periodOpen:100}),CONTINUITY.FLAT));
-test("missing values are unknown",()=>assert.equal(classifyContinuity({currentPrice:null,periodOpen:100}),CONTINUITY.UNKNOWN));
+test("missing current price is unknown",()=>assert.equal(classifyContinuity({currentPrice:null,periodOpen:100}),CONTINUITY.UNKNOWN));
+test("missing period open is unknown",()=>assert.equal(classifyContinuity({currentPrice:100,periodOpen:null}),CONTINUITY.UNKNOWN));
+test("empty string values are unknown",()=>assert.equal(classifyContinuity({currentPrice:"",periodOpen:100}),CONTINUITY.UNKNOWN));
 test("timeframe aliases normalize",()=>assert.equal(buildContinuityState({timeframe:"1D",currentPrice:101,periodOpen:100}).timeframe,"D"));
+test("missing values stay null in state",()=>{
+  const row=buildContinuityState({timeframe:"D",currentPrice:null,periodOpen:100});
+  assert.equal(row.state,CONTINUITY.UNKNOWN);
+  assert.equal(row.currentPrice,null);
+  assert.equal(row.distanceFromOpen,null);
+});
 test("distance from open is retained",()=>assert.equal(buildContinuityState({timeframe:"D",currentPrice:102.5,periodOpen:100}).distanceFromOpen,2.5));
 test("percent from open is descriptive",()=>assert.equal(buildContinuityState({timeframe:"D",currentPrice:102.5,periodOpen:100}).pctFromOpen,2.5));
 test("all bullish states produce full bullish continuity",()=>{
