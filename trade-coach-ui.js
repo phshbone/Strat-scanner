@@ -45,6 +45,6 @@ function buildTradeCoachViewModel(guidance){
   };
 }
 
-const api={severityClass,compactWhy,buildTradeCoachViewModel};
-if(typeof module!=="undefined"&&module.exports) module.exports=api;
-if(typeof globalThis!=="undefined") globalThis.StratTradeCoachUI=api;
+const tradeCoachUiApi={severityClass,compactWhy,buildTradeCoachViewModel};
+if(typeof module!=="undefined"&&module.exports) module.exports=tradeCoachUiApi;
+if(typeof globalThis!=="undefined") globalThis.StratTradeCoachUI=tradeCoachUiApi;
