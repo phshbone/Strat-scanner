@@ -8,6 +8,7 @@
   const DEFAULT_PROXY_BASE="https://thestrat.phshbone.workers.dev";
   const INTERVALS={"5":"5min","15":"15min","30":"30min"};
   const MAX_SCAN_SYMBOLS=20;
+  const WATCHLIST_STORAGE_KEY="strat.liveCandidates.watchlist.v1";
 
   function normalizeTimeframe(value){
     const raw=String(value||"").trim().toUpperCase();
@@ -41,13 +42,22 @@
     return list;
   }
 
-  function finiteValue(value){
-    return value!==null&&value!==undefined&&value!==""&&Number.isFinite(Number(value));
+  function isLoadShortcut(event){
+    return event?.key==="Enter"&&!event.shiftKey&&!event.altKey&&!event.ctrlKey&&!event.metaKey&&!event.isComposing;
   }
 
-  function rewardRiskText(card){
-    return finiteValue(card?.rewardRisk)?`${Number(card.rewardRisk).toFixed(2)}R`:"—";
+  function buildSavedWatchlist(symbols,timeframe){
+    return {version:1,symbols:prepareSymbolList(symbols),timeframe:normalizeTimeframe(timeframe)};
   }
+
+  function parseSavedWatchlist(value){
+    const record=typeof value==="string"?JSON.parse(value):value;
+    if(!record||Number(record.version)!==1) throw new Error("saved watchlist format is not supported");
+    return buildSavedWatchlist(record.symbols,record.timeframe);
+  }
+
+  function finiteValue(value){return value!==null&&value!==undefined&&value!==""&&Number.isFinite(Number(value));}
+  function rewardRiskText(card){return finiteValue(card?.rewardRisk)?`${Number(card.rewardRisk).toFixed(2)}R`:"—";}
 
   function consoleModeCopy(mode){
     const live=String(mode||"").toUpperCase()==="LIVE";
@@ -78,34 +88,22 @@
   }
 
   function attachSemantics(bar,{symbol,timeframe,providerAggregation}){
-    const tf=normalizeTimeframe(timeframe);
-    const intervalMinutes=Number(tf);
-    const epoch=parseUtc(bar.datetime||bar.rawDatetime||bar.time);
-    const p=nyParts(epoch);
-    const minuteOfDay=Number(p.hour)*60+Number(p.minute);
-    const rthOpen=9*60+30,rthClose=16*60;
+    const tf=normalizeTimeframe(timeframe),intervalMinutes=Number(tf),epoch=parseUtc(bar.datetime||bar.rawDatetime||bar.time),p=nyParts(epoch);
+    const minuteOfDay=Number(p.hour)*60+Number(p.minute),rthOpen=570,rthClose=960;
     if(Number(p.second)!==0) throw new Error("intraday bar open must be minute-aligned");
     if(minuteOfDay<rthOpen||minuteOfDay>=rthClose) throw new Error("intraday bar open is outside regular session");
     const offset=minuteOfDay-rthOpen;
     if(offset%intervalMinutes!==0) throw new Error("intraday bar open is not aligned to 09:30 RTH anchor");
-    const closeEpoch=epoch+intervalMinutes*60*1000;
-    const cp=nyParts(closeEpoch);
-    const closeMinute=Number(cp.hour)*60+Number(cp.minute);
-    const date=`${p.year}-${p.month}-${p.day}`;
+    const closeEpoch=epoch+intervalMinutes*60000,cp=nyParts(closeEpoch),closeMinute=Number(cp.hour)*60+Number(cp.minute),date=`${p.year}-${p.month}-${p.day}`;
     if(`${cp.year}-${cp.month}-${cp.day}`!==date||closeMinute>rthClose) throw new Error("intraday bar extends beyond regular session");
-    const sym=normalizeSymbol(symbol);
-    const hhmm=`${p.hour}:${p.minute}`;
-    const periodOpenId=`${sym}|${tf}|${date}|REGULAR|${hhmm}`;
-    const barOpenTimestamp=new Date(epoch).toISOString();
+    const sym=normalizeSymbol(symbol),hhmm=`${p.hour}:${p.minute}`,periodOpenId=`${sym}|${tf}|${date}|REGULAR|${hhmm}`,barOpenTimestamp=new Date(epoch).toISOString();
     const semantics={symbol:sym,timeframe:tf,marketTimezone:"America/New_York",session:"REGULAR",extendedHoursIncluded:false,barAnchor:"US_EQUITY_RTH_0930",barAnchorOffsetMinutes:offset,provider:"TWELVE_DATA",providerAggregation:providerAggregation||INTERVALS[tf],periodOpenId,periodOpenTimestamp:barOpenTimestamp,barOpenTimestamp,barCloseTimestamp:new Date(closeEpoch).toISOString()};
     return {...bar,semantics,semanticKey:[sym,tf,"America/New_York","REGULAR","NOEXT","US_EQUITY_RTH_0930",String(offset),"TWELVE_DATA",semantics.providerAggregation,periodOpenId].join("|")};
   }
 
   function normalizePayload(payload,{symbol,timeframe}){
     if(payload?.status==="error") throw new Error(payload.message||payload.code||"provider error");
-    const tf=normalizeTimeframe(timeframe);
-    const sym=normalizeSymbol(symbol);
-    const rows=Array.isArray(payload?.values)?payload.values:[];
+    const tf=normalizeTimeframe(timeframe),sym=normalizeSymbol(symbol),rows=Array.isArray(payload?.values)?payload.values:[];
     if(!rows.length) throw new Error("provider returned no bars");
     const bars=rows.map((row,index)=>{
       const open=Number(row.open),high=Number(row.high),low=Number(row.low),close=Number(row.close);
@@ -119,23 +117,17 @@
   }
 
   function buildProxyUrl({symbol,timeframe,outputsize=100,proxyBase=DEFAULT_PROXY_BASE}){
-    const tf=normalizeTimeframe(timeframe);
-    const sym=normalizeSymbol(symbol);
-    const n=Number(outputsize);
+    const tf=normalizeTimeframe(timeframe),sym=normalizeSymbol(symbol),n=Number(outputsize);
     if(!Number.isInteger(n)||n<3||n>5000) throw new Error("outputsize must be an integer from 3 to 5000");
     const base=new URL(String(proxyBase));
-    base.pathname=base.pathname.replace(/\/+$/g,"")+"/time-series";
-    base.search="";base.hash="";
-    base.searchParams.set("symbol",sym);
-    base.searchParams.set("interval",INTERVALS[tf]);
-    base.searchParams.set("outputsize",String(n));
+    base.pathname=base.pathname.replace(/\/+$/g,"")+"/time-series";base.search="";base.hash="";
+    base.searchParams.set("symbol",sym);base.searchParams.set("interval",INTERVALS[tf]);base.searchParams.set("outputsize",String(n));
     return base.toString();
   }
 
   async function fetchSeries({symbol,timeframe,outputsize=100,proxyBase=DEFAULT_PROXY_BASE,fetchImpl=globalThis.fetch}){
     if(typeof fetchImpl!=="function") throw new Error("fetch implementation required");
-    const url=buildProxyUrl({symbol,timeframe,outputsize,proxyBase});
-    const response=await fetchImpl(url,{headers:{Accept:"application/json"}});
+    const response=await fetchImpl(buildProxyUrl({symbol,timeframe,outputsize,proxyBase}),{headers:{Accept:"application/json"}});
     if(!response||response.ok===false) throw new Error(`market data proxy HTTP ${response?.status||"error"}`);
     return normalizePayload(await response.json(),{symbol,timeframe});
   }
@@ -145,24 +137,19 @@
     if(!scannerCardApi||typeof scannerCardApi.buildScannerCard!=="function") throw new Error("scanner card API required");
     const bars=series?.bars||[];
     if(bars.length<3) throw new Error("at least three semantic bars required");
-    const current=bars[bars.length-1];
-    const price=Number(current.close);
-    const setup=engine.detectSetup(bars);
+    const current=bars.at(-1),price=Number(current.close),setup=engine.detectSetup(bars);
     const directional=["BULLISH","BEARISH"].includes(setup?.direction)&&Number.isFinite(Number(setup?.trigger));
-    const closeAt=Date.parse(current?.semantics?.barCloseTimestamp||"");
-    const expired=Number.isFinite(closeAt)&&Number(now)>=closeAt;
+    const closeAt=Date.parse(current?.semantics?.barCloseTimestamp||""),expired=Number.isFinite(closeAt)&&Number(now)>=closeAt;
     const inForce=directional?(setup.direction==="BULLISH"?price>Number(setup.trigger):price<Number(setup.trigger)):false;
     const magnitudeHit=directional&&Number.isFinite(Number(setup.magnitude))?(setup.direction==="BULLISH"?price>=Number(setup.magnitude):price<=Number(setup.magnitude)):false;
     const actionable=directional&&!expired&&inForce&&!magnitudeHit&&setup.pathResolved!==false;
     const signal=directional?{setupId:setup.name,setupFamily:setup.name,direction:setup.direction,timeframe:series.timeframe,trigger:Number(setup.trigger),magnitude:Number.isFinite(Number(setup.magnitude))?Number(setup.magnitude):null,reference:setup.reference||null,currentType:setup.currentType||null,pathResolved:setup.pathResolved!==false,dataSemantics:current.semantics||null,semanticKey:current.semanticKey||null,actionable,expired,metadata:{marketDataSource:"LIVE_PROXY",provider:"TWELVE_DATA",interval:series.interval}}:null;
-    const signals=signal?[signal]:[];
-    const card=scannerCardApi.buildScannerCard({symbol:series.symbol,timeframe:series.timeframe,signals,primarySignal:signal,entry:signal?.trigger??null,stop:null,target:signal?.magnitude??null,observedAt:new Date(Number(now)).toISOString(),price});
+    const card=scannerCardApi.buildScannerCard({symbol:series.symbol,timeframe:series.timeframe,signals:signal?[signal]:[],primarySignal:signal,entry:signal?.trigger??null,stop:null,target:signal?.magnitude??null,observedAt:new Date(Number(now)).toISOString(),price});
     return {series,setup,signal,card,expired,actionable};
   }
 
   async function scan({symbols,timeframe="15",outputsize=100,fetchImpl=globalThis.fetch,engine,scannerCardApi,now=Date.now(),maxSymbols=MAX_SCAN_SYMBOLS}={}){
-    const list=prepareSymbolList(symbols,{maxSymbols});
-    const candidates=[],errors=[];
+    const list=prepareSymbolList(symbols,{maxSymbols}),candidates=[],errors=[];
     for(const symbol of list){
       try{candidates.push(buildCandidate(await fetchSeries({symbol,timeframe,outputsize,fetchImpl}),{engine,scannerCardApi,now}));}
       catch(error){errors.push({symbol,timeframe:String(timeframe),error:error?.message||String(error)});}
@@ -176,25 +163,20 @@
     window.__stratLiveCandidatesInstalled=true;
     const originalRenderCandidates=renderCandidates;
     let liveCards=null;
-    const card=document.querySelector("#candidates .card");
-    const toolbar=document.querySelector("#candidates .toolbar");
+    const card=document.querySelector("#candidates .card"),toolbar=document.querySelector("#candidates .toolbar");
     if(!card||!toolbar) return false;
 
     const controls=document.createElement("div");
     controls.className="toolbar";
-    controls.innerHTML='<input id="liveCandidateSymbols" value="SPY,QQQ,IWM" aria-label="Live candidate symbols" style="min-width:180px"><select id="liveCandidateTimeframe" aria-label="Live candidate timeframe"><option value="5">5m</option><option value="15" selected>15m</option><option value="30">30m</option></select><button class="btn" id="loadLiveCandidates" type="button">Load live</button><button class="btn secondary" id="useSampleCandidates" type="button">Use sample</button><span id="liveCandidateStatus" class="small">Sample cards active</span><span id="liveCandidateBudget" class="small">Manual scan • max 20 unique symbols • one timeframe • no auto-refresh</span>';
+    controls.innerHTML='<input id="liveCandidateSymbols" value="SPY,QQQ,IWM" aria-label="Live candidate symbols" style="min-width:180px"><select id="liveCandidateTimeframe" aria-label="Live candidate timeframe"><option value="5">5m</option><option value="15" selected>15m</option><option value="30">30m</option></select><button class="btn" id="loadLiveCandidates" type="button">Load live</button><button class="btn secondary" id="saveLiveWatchlist" type="button">Save list</button><button class="btn secondary" id="loadSavedWatchlist" type="button">Load saved</button><button class="btn secondary" id="useSampleCandidates" type="button">Use sample</button><span id="liveCandidateStatus" class="small">Sample cards active</span><span id="liveCandidateBudget" class="small">Enter = Load live • max 20 unique symbols • one timeframe • no auto-refresh</span>';
     toolbar.parentNode.insertBefore(controls,toolbar);
-    const heading=card.querySelector("h2");
-    if(heading) heading.textContent="Candidate Ranking — Deterministic Scanner";
+    const heading=card.querySelector("h2");if(heading) heading.textContent="Candidate Ranking — Deterministic Scanner";
     const candidateNote=Array.from(card.querySelectorAll(".small")).at(-1)||null;
+    const symbolsInput=document.querySelector("#liveCandidateSymbols"),timeframeSelect=document.querySelector("#liveCandidateTimeframe"),loadButton=document.querySelector("#loadLiveCandidates"),status=document.querySelector("#liveCandidateStatus");
 
     function setConsoleMode(mode){
-      const copy=consoleModeCopy(mode);
-      const badge=document.querySelector(".topbar .badge");
-      const subtitle=document.querySelector(".topbar .subtitle");
-      if(badge) badge.textContent=copy.badge;
-      if(subtitle) subtitle.textContent=copy.subtitle;
-      if(candidateNote) candidateNote.textContent=copy.note;
+      const copy=consoleModeCopy(mode),badge=document.querySelector(".topbar .badge"),subtitle=document.querySelector(".topbar .subtitle");
+      if(badge) badge.textContent=copy.badge;if(subtitle) subtitle.textContent=copy.subtitle;if(candidateNote) candidateNote.textContent=copy.note;
     }
 
     function renderLive(){
@@ -202,51 +184,54 @@
       rankedCards=liveCards.slice();
       const d=document.querySelector("#directionFilter")?.value||"ALL",s=document.querySelector("#statusFilter")?.value||"ALL";
       const rows=rankedCards.filter(c=>(d==="ALL"||(d==="NONE"?!c.direction:c.direction===d))&&(s==="ALL"||c.advisoryState===s));
-      const esc2=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
-      const fmt2=n=>finiteValue(n)?`$${Number(n).toFixed(2)}`:"—";
-      const st=c=>c.advisoryState==="ACTIVE_TRADE_CONTEXT"?"ACTIVE":c.advisoryState==="WATCH_ACTIONABLE_SETUP"?"WATCH":"WAIT";
-      const body=document.querySelector("#candidateBody");
+      const esc2=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])),fmt2=n=>finiteValue(n)?`$${Number(n).toFixed(2)}`:"—",st=c=>c.advisoryState==="ACTIVE_TRADE_CONTEXT"?"ACTIVE":c.advisoryState==="WATCH_ACTIONABLE_SETUP"?"WATCH":"WAIT",body=document.querySelector("#candidateBody");
       body.innerHTML=rows.map(c=>{const rank=rankedCards.indexOf(c)+1;return `<tr><td>${rank}</td><td><strong>${esc2(c.symbol)}</strong></td><td class="${c.direction==="BULLISH"?"ok":c.direction==="BEARISH"?"bad":"warn"}">${esc2(c.direction||"—")}</td><td>${fmt2(c.price)}</td><td>${esc2(c.timeframe)}</td><td>${esc2(c.setup||"—")}</td><td>${esc2(c.ftfc?.alignment||"—")}</td><td>${esc2(c.breadth?.index?.context||"—")}</td><td>${esc2(c.breadth?.sector?.context||"—")}</td><td class="${c.rewardRiskStatus==="PASS"?"ok":c.rewardRiskStatus==="FAIL"?"bad":"warn"}">${rewardRiskText(c)}</td><td><span class="statusPill ${st(c)==="WAIT"?"warn":"ok"}">${st(c)}</span></td><td><button class="btn tiny secondary whyBtn" data-symbol="${esc2(c.symbol)}">Why?</button></td></tr>`}).join("");
       document.querySelectorAll(".whyBtn").forEach(btn=>btn.addEventListener("click",()=>showWhy(btn.dataset.symbol)));
       if(!rows.length) body.innerHTML='<tr><td colspan="12" class="small">No live cards match this filter.</td></tr>';
     }
-    renderCandidates=renderLive;
-    setConsoleMode("SAMPLE");
+    renderCandidates=renderLive;setConsoleMode("SAMPLE");
 
-    document.querySelector("#loadLiveCandidates").addEventListener("click",async()=>{
-      const status=document.querySelector("#liveCandidateStatus");
-      const timeframe=document.querySelector("#liveCandidateTimeframe").value;
+    async function loadLive(){
+      if(loadButton.disabled) return;
       let symbols;
-      try{
-        symbols=prepareSymbolList(document.querySelector("#liveCandidateSymbols").value);
-      }catch(error){
-        status.textContent=error.message;
-        status.className="small bad";
-        return;
-      }
-      status.textContent=`Loading ${symbols.length} live ${timeframe}m symbols…`;
-      status.className="small warn";
+      try{symbols=prepareSymbolList(symbolsInput.value);}catch(error){status.textContent=error.message;status.className="small bad";return;}
+      const timeframe=timeframeSelect.value;
+      status.textContent=`Loading ${symbols.length} live ${timeframe}m symbols…`;status.className="small warn";loadButton.disabled=true;
       try{
         const result=await scan({symbols,timeframe,engine:{detectSetup},scannerCardApi:window.StratScannerCard,now:Date.now()});
-        liveCards=result.cards;
-        renderCandidates();
-        setConsoleMode("LIVE");
-        status.textContent=`LIVE PROXY • ${result.succeeded}/${result.requested} loaded${result.failed?` • ${result.failed} failed`:""}`;
-        status.className=result.failed?"small warn":"small ok";
-      }catch(error){
-        status.textContent=`Live scan failed: ${error.message}`;
-        status.className="small bad";
-      }
+        liveCards=result.cards;renderCandidates();setConsoleMode("LIVE");
+        status.textContent=`LIVE PROXY • ${result.succeeded}/${result.requested} loaded${result.failed?` • ${result.failed} failed`:""}`;status.className=result.failed?"small warn":"small ok";
+      }catch(error){status.textContent=`Live scan failed: ${error.message}`;status.className="small bad";}
+      finally{loadButton.disabled=false;}
+    }
+
+    loadButton.addEventListener("click",loadLive);
+    symbolsInput.addEventListener("keydown",event=>{if(!isLoadShortcut(event)) return;event.preventDefault();loadButton.click();});
+
+    document.querySelector("#saveLiveWatchlist").addEventListener("click",()=>{
+      try{
+        const record=buildSavedWatchlist(symbolsInput.value,timeframeSelect.value);
+        window.localStorage.setItem(WATCHLIST_STORAGE_KEY,JSON.stringify(record));
+        symbolsInput.value=record.symbols.join(",");
+        status.textContent=`Saved ${record.symbols.length} symbols • ${record.timeframe}m`;status.className="small ok";
+      }catch(error){status.textContent=`Save failed: ${error.message}`;status.className="small bad";}
     });
+
+    document.querySelector("#loadSavedWatchlist").addEventListener("click",()=>{
+      try{
+        const raw=window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
+        if(!raw) throw new Error("no saved watchlist yet");
+        const record=parseSavedWatchlist(raw);
+        symbolsInput.value=record.symbols.join(",");timeframeSelect.value=record.timeframe;
+        status.textContent=`Saved list loaded • ${record.symbols.length} symbols • press Enter or Load live`;status.className="small ok";
+      }catch(error){status.textContent=`Load saved failed: ${error.message}`;status.className="small bad";}
+    });
+
     document.querySelector("#useSampleCandidates").addEventListener("click",()=>{
-      liveCards=null;
-      setConsoleMode("SAMPLE");
-      document.querySelector("#liveCandidateStatus").textContent="Sample cards active";
-      document.querySelector("#liveCandidateStatus").className="small";
-      originalRenderCandidates();
+      liveCards=null;setConsoleMode("SAMPLE");status.textContent="Sample cards active";status.className="small";originalRenderCandidates();
     });
     return true;
   }
 
-  return {DEFAULT_PROXY_BASE,INTERVALS,MAX_SCAN_SYMBOLS,normalizeTimeframe,normalizeSymbol,prepareSymbolList,finiteValue,rewardRiskText,consoleModeCopy,parseUtc,attachSemantics,normalizePayload,buildProxyUrl,fetchSeries,buildCandidate,scan,installResearchConsole};
+  return {DEFAULT_PROXY_BASE,INTERVALS,MAX_SCAN_SYMBOLS,WATCHLIST_STORAGE_KEY,normalizeTimeframe,normalizeSymbol,prepareSymbolList,isLoadShortcut,buildSavedWatchlist,parseSavedWatchlist,finiteValue,rewardRiskText,consoleModeCopy,parseUtc,attachSemantics,normalizePayload,buildProxyUrl,fetchSeries,buildCandidate,scan,installResearchConsole};
 });
