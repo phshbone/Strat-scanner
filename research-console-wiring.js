@@ -9,11 +9,18 @@
   let lastVisibleModel=null;
   let renderWrapped=false;
 
+  function scriptReady(src){
+    if(src.includes("trade-coach-ui")) return !!window.StratTradeCoachUI;
+    if(src.includes("trade-coach.js")) return !!window.StratTradeCoach;
+    if(src.includes("live-candidates-ui")) return !!window.StratLiveCandidatesUI;
+    return true;
+  }
+
   function loadScript(src){
     return new Promise((resolve,reject)=>{
       if(document.querySelector(`script[src="${src}"]`)){
         const wait=()=>{
-          if((src.includes("trade-coach-ui")&&window.StratTradeCoachUI)||(src.includes("trade-coach.js")&&window.StratTradeCoach)) resolve();
+          if(scriptReady(src)) resolve();
           else setTimeout(wait,25);
         };
         wait();
@@ -156,6 +163,7 @@
     try{
       await loadScript("trade-coach.js");
       await loadScript("trade-coach-ui.js");
+      await loadScript("live-candidates-ui.js");
       ensurePanel();
       let tries=0;
       const timer=setInterval(()=>{
@@ -163,13 +171,14 @@
         if(tryWrapRender()){
           clearInterval(timer);
           updateCoach();
+          if(window.StratLiveCandidatesUI) window.StratLiveCandidatesUI.installResearchConsole();
         }else if(tries>200){
           clearInterval(timer);
         }
       },25);
     }catch(err){
       const panel=ensurePanel();
-      if(panel) panel.querySelector("#tradeCoachMessage").textContent=`Trade Coach wiring error: ${err.message}`;
+      if(panel) panel.querySelector("#tradeCoachMessage").textContent=`Research Console wiring error: ${err.message}`;
     }
   }
 
