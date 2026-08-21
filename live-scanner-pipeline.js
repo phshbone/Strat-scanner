@@ -6,7 +6,6 @@ const scannerCard=require("./scanner-card.js");
 const liveData=require("./live-intraday-data.js");
 
 function nonEmpty(v){return typeof v==="string"&&v.trim().length>0;}
-function finite(v){return v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v));}
 
 function buildLiveScannerCandidate({series,sector=null,minRewardRisk=2,historicalEvidence=null,observedAt=null}={}){
   if(!series||!nonEmpty(series.symbol)||!nonEmpty(series.timeframe)) throw new Error("live series symbol/timeframe required");
@@ -20,17 +19,30 @@ function buildLiveScannerCandidate({series,sector=null,minRewardRisk=2,historica
   const setup=core.detectSetup(bars);
   const semanticKey=currentBar.semanticKey||null;
   const dataSemantics=currentBar.semantics||null;
-  const signal=signalAdapter.setupToSignal(setup,{
-    timeframe:series.timeframe,
-    dataSemantics,
-    semanticKey,
-    metadata:{
-      marketDataSource:series.source||"LIVE_PROXY",
-      provider:series.provider||null,
-      interval:series.interval||null
+  const signalState=signalAdapter.buildSetupSignalState({
+    setup,
+    currentPrice,
+    now:observedAt||Date.now(),
+    signalOptions:{
+      timeframe:series.timeframe,
+      signalStartsAt:dataSemantics?.barOpenTimestamp||null,
+      signalExpiresAt:dataSemantics?.barCloseTimestamp||null,
+      dataSemantics,
+      semanticKey,
+      metadata:{
+        marketDataSource:series.source||"LIVE_PROXY",
+        provider:series.provider||null,
+        interval:series.interval||null
+      }
     }
   });
 
+  const signal=signalState.signal?{
+    ...signalState.signal,
+    state:signalState.lifecycle?.status||null,
+    actionable:signalState.lifecycle?.active===true,
+    expired:signalState.lifecycle?.expired===true
+  }:null;
   const signals=signal?[signal]:[];
   const card=scannerCard.buildScannerCard({
     symbol:series.symbol,
@@ -57,6 +69,7 @@ function buildLiveScannerCandidate({series,sector=null,minRewardRisk=2,historica
     latestSemanticKey:semanticKey,
     setup,
     signal,
+    lifecycle:signalState.lifecycle||null,
     card
   };
 }
