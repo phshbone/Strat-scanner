@@ -57,6 +57,6 @@ function deriveTradeCoachGuidance({setupContext=null,previousSetupContext=null,p
   return {emit:false,code:"STATE_CHANGE_NOT_GUIDANCE_WORTHY",observedAt};
 }
 
-const api={contextFingerprint,changed,deriveTradeCoachGuidance};
-if(typeof module!=="undefined"&&module.exports) module.exports=api;
-if(typeof globalThis!=="undefined") globalThis.StratTradeCoach=api;
+const tradeCoachApi={contextFingerprint,changed,deriveTradeCoachGuidance};
+if(typeof module!=="undefined"&&module.exports) module.exports=tradeCoachApi;
+if(typeof globalThis!=="undefined") globalThis.StratTradeCoach=tradeCoachApi;
