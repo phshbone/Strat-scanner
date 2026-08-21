@@ -22,6 +22,27 @@
     return symbol;
   }
 
+  function finiteValue(value){
+    return value!==null&&value!==undefined&&value!==""&&Number.isFinite(Number(value));
+  }
+
+  function rewardRiskText(card){
+    return finiteValue(card?.rewardRisk)?`${Number(card.rewardRisk).toFixed(2)}R`:"—";
+  }
+
+  function consoleModeCopy(mode){
+    const live=String(mode||"").toUpperCase()==="LIVE";
+    return live?{
+      badge:"LIVE CANDIDATES",
+      subtitle:"Deterministic engine monitor • live Candidates • sample Monitor",
+      note:"Live scanner cards use the deterministic scanner-card/setup-context model. Context supports a setup; it cannot create one."
+    }:{
+      badge:"SAMPLE DATA",
+      subtitle:"Deterministic engine monitor • shared setup context • sample-data mode",
+      note:"Sample cards use the same scanner-card/setup-context model intended for Practice Mode and Trade Coach. Context supports a setup; it cannot create one."
+    };
+  }
+
   function parseUtc(value){
     const raw=String(value||"").trim();
     let iso=raw;
@@ -146,6 +167,16 @@
     toolbar.parentNode.insertBefore(controls,toolbar);
     const heading=card.querySelector("h2");
     if(heading) heading.textContent="Candidate Ranking — Deterministic Scanner";
+    const candidateNote=Array.from(card.querySelectorAll(".small")).at(-1)||null;
+
+    function setConsoleMode(mode){
+      const copy=consoleModeCopy(mode);
+      const badge=document.querySelector(".topbar .badge");
+      const subtitle=document.querySelector(".topbar .subtitle");
+      if(badge) badge.textContent=copy.badge;
+      if(subtitle) subtitle.textContent=copy.subtitle;
+      if(candidateNote) candidateNote.textContent=copy.note;
+    }
 
     function renderLive(){
       if(!liveCards) return originalRenderCandidates();
@@ -153,15 +184,15 @@
       const d=document.querySelector("#directionFilter")?.value||"ALL",s=document.querySelector("#statusFilter")?.value||"ALL";
       const rows=rankedCards.filter(c=>(d==="ALL"||(d==="NONE"?!c.direction:c.direction===d))&&(s==="ALL"||c.advisoryState===s));
       const esc2=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
-      const fmt2=n=>Number.isFinite(Number(n))?`$${Number(n).toFixed(2)}`:"—";
-      const rr=c=>Number.isFinite(Number(c.rewardRisk))?`${Number(c.rewardRisk).toFixed(2)}R`:"—";
+      const fmt2=n=>finiteValue(n)?`$${Number(n).toFixed(2)}`:"—";
       const st=c=>c.advisoryState==="ACTIVE_TRADE_CONTEXT"?"ACTIVE":c.advisoryState==="WATCH_ACTIONABLE_SETUP"?"WATCH":"WAIT";
       const body=document.querySelector("#candidateBody");
-      body.innerHTML=rows.map(c=>{const rank=rankedCards.indexOf(c)+1;return `<tr><td>${rank}</td><td><strong>${esc2(c.symbol)}</strong></td><td class="${c.direction==="BULLISH"?"ok":c.direction==="BEARISH"?"bad":"warn"}">${esc2(c.direction||"—")}</td><td>${fmt2(c.price)}</td><td>${esc2(c.timeframe)}</td><td>${esc2(c.setup||"—")}</td><td>${esc2(c.ftfc?.alignment||"—")}</td><td>${esc2(c.breadth?.index?.context||"—")}</td><td>${esc2(c.breadth?.sector?.context||"—")}</td><td class="${c.rewardRiskStatus==="PASS"?"ok":c.rewardRiskStatus==="FAIL"?"bad":"warn"}">${rr(c)}</td><td><span class="statusPill ${st(c)==="WAIT"?"warn":"ok"}">${st(c)}</span></td><td><button class="btn tiny secondary whyBtn" data-symbol="${esc2(c.symbol)}">Why?</button></td></tr>`}).join("");
+      body.innerHTML=rows.map(c=>{const rank=rankedCards.indexOf(c)+1;return `<tr><td>${rank}</td><td><strong>${esc2(c.symbol)}</strong></td><td class="${c.direction==="BULLISH"?"ok":c.direction==="BEARISH"?"bad":"warn"}">${esc2(c.direction||"—")}</td><td>${fmt2(c.price)}</td><td>${esc2(c.timeframe)}</td><td>${esc2(c.setup||"—")}</td><td>${esc2(c.ftfc?.alignment||"—")}</td><td>${esc2(c.breadth?.index?.context||"—")}</td><td>${esc2(c.breadth?.sector?.context||"—")}</td><td class="${c.rewardRiskStatus==="PASS"?"ok":c.rewardRiskStatus==="FAIL"?"bad":"warn"}">${rewardRiskText(c)}</td><td><span class="statusPill ${st(c)==="WAIT"?"warn":"ok"}">${st(c)}</span></td><td><button class="btn tiny secondary whyBtn" data-symbol="${esc2(c.symbol)}">Why?</button></td></tr>`}).join("");
       document.querySelectorAll(".whyBtn").forEach(btn=>btn.addEventListener("click",()=>showWhy(btn.dataset.symbol)));
       if(!rows.length) body.innerHTML='<tr><td colspan="12" class="small">No live cards match this filter.</td></tr>';
     }
     renderCandidates=renderLive;
+    setConsoleMode("SAMPLE");
 
     document.querySelector("#loadLiveCandidates").addEventListener("click",async()=>{
       const status=document.querySelector("#liveCandidateStatus");
@@ -173,6 +204,7 @@
         const result=await scan({symbols,timeframe,engine:{detectSetup},scannerCardApi:window.StratScannerCard,now:Date.now()});
         liveCards=result.cards;
         renderCandidates();
+        setConsoleMode("LIVE");
         status.textContent=`LIVE PROXY • ${result.succeeded}/${result.requested} loaded${result.failed?` • ${result.failed} failed`:""}`;
         status.className=result.failed?"small warn":"small ok";
       }catch(error){
@@ -182,6 +214,7 @@
     });
     document.querySelector("#useSampleCandidates").addEventListener("click",()=>{
       liveCards=null;
+      setConsoleMode("SAMPLE");
       document.querySelector("#liveCandidateStatus").textContent="Sample cards active";
       document.querySelector("#liveCandidateStatus").className="small";
       originalRenderCandidates();
@@ -189,5 +222,5 @@
     return true;
   }
 
-  return {DEFAULT_PROXY_BASE,INTERVALS,normalizeTimeframe,normalizeSymbol,parseUtc,attachSemantics,normalizePayload,buildProxyUrl,fetchSeries,buildCandidate,scan,installResearchConsole};
+  return {DEFAULT_PROXY_BASE,INTERVALS,normalizeTimeframe,normalizeSymbol,finiteValue,rewardRiskText,consoleModeCopy,parseUtc,attachSemantics,normalizePayload,buildProxyUrl,fetchSeries,buildCandidate,scan,installResearchConsole};
 });
