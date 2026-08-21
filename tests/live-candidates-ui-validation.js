@@ -32,7 +32,16 @@ function payload(){return {
   check("deterministic core detects live 2-2",candidate.setup.name==="2-2"&&candidate.setup.direction==="BULLISH");
   check("live signal is actionable before source bar closes",candidate.signal?.actionable===true&&candidate.card.actionable===true);
   check("live candidate keeps R:R unknown without stop",candidate.card.rewardRisk===null&&candidate.card.rewardRiskStatus==="UNKNOWN");
+  check("unknown R:R renders as dash instead of zero",ui.rewardRiskText(candidate.card)==="—");
+  check("real numeric R:R still renders",ui.rewardRiskText({rewardRisk:3.83})==="3.83R");
   check("no probability is manufactured",candidate.card.probabilityScore===null);
+
+  const liveCopy=ui.consoleModeCopy("LIVE");
+  check("live mode badge is explicit",liveCopy.badge==="LIVE CANDIDATES");
+  check("live mode does not claim Monitor is live",/sample Monitor/.test(liveCopy.subtitle));
+  check("live mode note no longer says sample cards",/^Live scanner cards/.test(liveCopy.note));
+  const sampleCopy=ui.consoleModeCopy("SAMPLE");
+  check("sample mode restores sample badge",sampleCopy.badge==="SAMPLE DATA");
 
   const expired=ui.buildCandidate(series,{engine:core,scannerCardApi:scanner,now:Date.parse("2026-08-21T14:20:00Z")});
   check("expired live bar cannot stay actionable",expired.signal?.expired===true&&expired.card.actionable===false);
