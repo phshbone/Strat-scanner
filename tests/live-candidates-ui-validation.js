@@ -28,6 +28,17 @@ function payload(){return {
   let tooMany=false;try{ui.prepareSymbolList(Array.from({length:21},(_,i)=>`S${i}`));}catch(error){tooMany=/limited to 20/.test(error.message);}check("more than 20 unique symbols is rejected",tooMany);
   let empty=false;try{ui.prepareSymbolList(" , ");}catch(error){empty=/at least one symbol/.test(error.message);}check("empty watchlist is rejected before provider calls",empty);
 
+  check("plain Enter is the live-load shortcut",ui.isLoadShortcut({key:"Enter"})===true);
+  check("modified Enter does not trigger live load",ui.isLoadShortcut({key:"Enter",ctrlKey:true})===false&&ui.isLoadShortcut({key:"Enter",shiftKey:true})===false);
+  check("IME composition Enter does not trigger live load",ui.isLoadShortcut({key:"Enter",isComposing:true})===false);
+  check("non-Enter key does not trigger live load",ui.isLoadShortcut({key:"Tab"})===false);
+
+  const saved=ui.buildSavedWatchlist(" spy, qqq, spy ","15m");
+  check("saved watchlist normalizes symbols and timeframe",saved.symbols.join(",")==="SPY,QQQ"&&saved.timeframe==="15"&&saved.version===1);
+  const restored=ui.parseSavedWatchlist(JSON.stringify(saved));
+  check("saved watchlist round-trips without provider access",restored.symbols.join(",")==="SPY,QQQ"&&restored.timeframe==="15");
+  let oldFormat=false;try{ui.parseSavedWatchlist(JSON.stringify({version:2,symbols:["SPY"],timeframe:"15"}));}catch(error){oldFormat=/not supported/.test(error.message);}check("unsupported saved watchlist format is rejected",oldFormat);
+
   const series=ui.normalizePayload(payload(),{symbol:"SPY",timeframe:"15"});
   check("provider bars are sorted ascending",series.bars[0].datetime==="2026-08-21 13:30:00"&&series.bars[2].datetime==="2026-08-21 14:00:00");
   check("RTH semantic provenance is attached",series.bars[0].semantics?.session==="REGULAR"&&series.bars[0].semantics?.barAnchor==="US_EQUITY_RTH_0930");
