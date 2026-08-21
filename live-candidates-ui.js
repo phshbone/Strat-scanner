@@ -7,6 +7,7 @@
 })(typeof globalThis!=="undefined"?globalThis:this,function(){
   const DEFAULT_PROXY_BASE="https://thestrat.phshbone.workers.dev";
   const INTERVALS={"5":"5min","15":"15min","30":"30min"};
+  const MAX_SCAN_SYMBOLS=20;
 
   function normalizeTimeframe(value){
     const raw=String(value||"").trim().toUpperCase();
@@ -22,6 +23,24 @@
     return symbol;
   }
 
+  function prepareSymbolList(value,{maxSymbols=MAX_SCAN_SYMBOLS}={}){
+    const raw=Array.isArray(value)?value:String(value||"").split(",");
+    const list=[];
+    const seen=new Set();
+    for(const item of raw){
+      if(String(item||"").trim()==="") continue;
+      const symbol=normalizeSymbol(item);
+      if(seen.has(symbol)) continue;
+      seen.add(symbol);
+      list.push(symbol);
+    }
+    if(!list.length) throw new Error("at least one symbol required");
+    const max=Number(maxSymbols);
+    if(!Number.isInteger(max)||max<1) throw new Error("maxSymbols must be a positive integer");
+    if(list.length>max) throw new Error(`manual live scan is limited to ${max} unique symbols per run`);
+    return list;
+  }
+
   function finiteValue(value){
     return value!==null&&value!==undefined&&value!==""&&Number.isFinite(Number(value));
   }
@@ -35,7 +54,7 @@
     return live?{
       badge:"LIVE CANDIDATES",
       subtitle:"Deterministic engine monitor • live Candidates • sample Monitor",
-      note:"Live scanner cards use the deterministic scanner-card/setup-context model. Context supports a setup; it cannot create one."
+      note:"Live scanner cards use the deterministic scanner-card/setup-context model. Manual scans are capped at 20 unique symbols and one timeframe per run. Context supports a setup; it cannot create one."
     }:{
       badge:"SAMPLE DATA",
       subtitle:"Deterministic engine monitor • shared setup context • sample-data mode",
@@ -141,14 +160,14 @@
     return {series,setup,signal,card,expired,actionable};
   }
 
-  async function scan({symbols,timeframe="15",outputsize=100,fetchImpl=globalThis.fetch,engine,scannerCardApi,now=Date.now()}={}){
-    const list=(Array.isArray(symbols)?symbols:[]).map(normalizeSymbol);
+  async function scan({symbols,timeframe="15",outputsize=100,fetchImpl=globalThis.fetch,engine,scannerCardApi,now=Date.now(),maxSymbols=MAX_SCAN_SYMBOLS}={}){
+    const list=prepareSymbolList(symbols,{maxSymbols});
     const candidates=[],errors=[];
     for(const symbol of list){
       try{candidates.push(buildCandidate(await fetchSeries({symbol,timeframe,outputsize,fetchImpl}),{engine,scannerCardApi,now}));}
       catch(error){errors.push({symbol,timeframe:String(timeframe),error:error?.message||String(error)});}
     }
-    return {requested:list.length,succeeded:candidates.length,failed:errors.length,candidates,cards:scannerCardApi.rankScannerCards(candidates.map(x=>x.card)),errors};
+    return {requested:list.length,succeeded:candidates.length,failed:errors.length,candidates,cards:scannerCardApi.rankScannerCards(candidates.map(x=>x.card)),errors,manual:true,maxSymbols};
   }
 
   function installResearchConsole(){
@@ -163,7 +182,7 @@
 
     const controls=document.createElement("div");
     controls.className="toolbar";
-    controls.innerHTML='<input id="liveCandidateSymbols" value="SPY,QQQ,IWM" aria-label="Live candidate symbols" style="min-width:180px"><select id="liveCandidateTimeframe" aria-label="Live candidate timeframe"><option value="5">5m</option><option value="15" selected>15m</option><option value="30">30m</option></select><button class="btn" id="loadLiveCandidates" type="button">Load live</button><button class="btn secondary" id="useSampleCandidates" type="button">Use sample</button><span id="liveCandidateStatus" class="small">Sample cards active</span>';
+    controls.innerHTML='<input id="liveCandidateSymbols" value="SPY,QQQ,IWM" aria-label="Live candidate symbols" style="min-width:180px"><select id="liveCandidateTimeframe" aria-label="Live candidate timeframe"><option value="5">5m</option><option value="15" selected>15m</option><option value="30">30m</option></select><button class="btn" id="loadLiveCandidates" type="button">Load live</button><button class="btn secondary" id="useSampleCandidates" type="button">Use sample</button><span id="liveCandidateStatus" class="small">Sample cards active</span><span id="liveCandidateBudget" class="small">Manual scan • max 20 unique symbols • one timeframe • no auto-refresh</span>';
     toolbar.parentNode.insertBefore(controls,toolbar);
     const heading=card.querySelector("h2");
     if(heading) heading.textContent="Candidate Ranking — Deterministic Scanner";
@@ -196,8 +215,15 @@
 
     document.querySelector("#loadLiveCandidates").addEventListener("click",async()=>{
       const status=document.querySelector("#liveCandidateStatus");
-      const symbols=document.querySelector("#liveCandidateSymbols").value.split(",").map(s=>s.trim()).filter(Boolean);
       const timeframe=document.querySelector("#liveCandidateTimeframe").value;
+      let symbols;
+      try{
+        symbols=prepareSymbolList(document.querySelector("#liveCandidateSymbols").value);
+      }catch(error){
+        status.textContent=error.message;
+        status.className="small bad";
+        return;
+      }
       status.textContent=`Loading ${symbols.length} live ${timeframe}m symbols…`;
       status.className="small warn";
       try{
@@ -222,5 +248,5 @@
     return true;
   }
 
-  return {DEFAULT_PROXY_BASE,INTERVALS,normalizeTimeframe,normalizeSymbol,finiteValue,rewardRiskText,consoleModeCopy,parseUtc,attachSemantics,normalizePayload,buildProxyUrl,fetchSeries,buildCandidate,scan,installResearchConsole};
+  return {DEFAULT_PROXY_BASE,INTERVALS,MAX_SCAN_SYMBOLS,normalizeTimeframe,normalizeSymbol,prepareSymbolList,finiteValue,rewardRiskText,consoleModeCopy,parseUtc,attachSemantics,normalizePayload,buildProxyUrl,fetchSeries,buildCandidate,scan,installResearchConsole};
 });
