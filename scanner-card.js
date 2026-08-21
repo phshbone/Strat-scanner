@@ -1,7 +1,7 @@
 "use strict";
 
 const contextModule=(typeof module!=="undefined"&&module.exports)?require("./setup-context.js"):(globalThis.StratSetupContext||{});
-const buildSetupContext=contextModule.buildSetupContext;
+const buildSetupContextFn=contextModule.buildSetupContext;
 
 function finite(v){return v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v));}
 function normalizeSymbol(v){return String(v||"").trim().toUpperCase();}
@@ -22,9 +22,9 @@ function buildScannerCard({
   symbol,timeframe,signals=[],primarySignal=null,practiceTrade=null,carrier=null,ftfc=null,indexBreadth=null,sectorBreadth=null,
   entry=null,stop=null,target=null,minRewardRisk=2,historicalEvidence=null,observedAt=null,sector=null,price=null
 }={}){
-  if(typeof buildSetupContext!=="function") throw new Error("setup-context dependency unavailable");
+  if(typeof buildSetupContextFn!=="function") throw new Error("setup-context dependency unavailable");
 
-  const context=practiceTrade?.context?.setupContext||buildSetupContext({
+  const context=practiceTrade?.context?.setupContext||buildSetupContextFn({
     signals,primarySignal,practiceTrade,carrier,ftfc,indexBreadth,sectorBreadth,entry,stop,target,minRewardRisk,historicalEvidence
   });
   const signal=context?.signal||practiceTrade?.context?.signal||null;
