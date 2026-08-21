@@ -23,6 +23,11 @@ function payload(){return {
   check("browser request uses Cloudflare proxy",url.startsWith("https://thestrat.phshbone.workers.dev/time-series?"));
   check("browser request contains no API key",!url.toLowerCase().includes("apikey"));
 
+  check("manual scan cap is explicit",ui.MAX_SCAN_SYMBOLS===20);
+  check("symbol list normalizes and deduplicates",ui.prepareSymbolList(" spy, QQQ,spy , iwm ").join(",")==="SPY,QQQ,IWM");
+  let tooMany=false;try{ui.prepareSymbolList(Array.from({length:21},(_,i)=>`S${i}`));}catch(error){tooMany=/limited to 20/.test(error.message);}check("more than 20 unique symbols is rejected",tooMany);
+  let empty=false;try{ui.prepareSymbolList(" , ");}catch(error){empty=/at least one symbol/.test(error.message);}check("empty watchlist is rejected before provider calls",empty);
+
   const series=ui.normalizePayload(payload(),{symbol:"SPY",timeframe:"15"});
   check("provider bars are sorted ascending",series.bars[0].datetime==="2026-08-21 13:30:00"&&series.bars[2].datetime==="2026-08-21 14:00:00");
   check("RTH semantic provenance is attached",series.bars[0].semantics?.session==="REGULAR"&&series.bars[0].semantics?.barAnchor==="US_EQUITY_RTH_0930");
@@ -39,7 +44,7 @@ function payload(){return {
   const liveCopy=ui.consoleModeCopy("LIVE");
   check("live mode badge is explicit",liveCopy.badge==="LIVE CANDIDATES");
   check("live mode does not claim Monitor is live",/sample Monitor/.test(liveCopy.subtitle));
-  check("live mode note no longer says sample cards",/^Live scanner cards/.test(liveCopy.note));
+  check("live mode note states bounded manual scan",/capped at 20 unique symbols/.test(liveCopy.note));
   const sampleCopy=ui.consoleModeCopy("SAMPLE");
   check("sample mode restores sample badge",sampleCopy.badge==="SAMPLE DATA");
 
@@ -48,9 +53,12 @@ function payload(){return {
 
   let outside=false;try{ui.attachSemantics({datetime:"2026-08-21 12:00:00",open:1,high:2,low:1,close:2},{symbol:"SPY",timeframe:"15",providerAggregation:"15min"});}catch(_){outside=true;}check("pre-market bars are rejected for RTH production semantics",outside);
 
-  const fakeFetch=async()=>({ok:true,json:async()=>payload()});
-  const scan=await ui.scan({symbols:["SPY","QQQ"],timeframe:"15",fetchImpl:fakeFetch,engine:core,scannerCardApi:scanner,now:Date.parse("2026-08-21T14:05:00Z")});
+  let fetchCount=0;
+  const fakeFetch=async()=>{fetchCount+=1;return {ok:true,json:async()=>payload()};};
+  const scan=await ui.scan({symbols:["SPY","QQQ","SPY"],timeframe:"15",fetchImpl:fakeFetch,engine:core,scannerCardApi:scanner,now:Date.parse("2026-08-21T14:05:00Z")});
   check("browser watchlist scan returns ranked cards",scan.requested===2&&scan.succeeded===2&&scan.cards.length===2);
+  check("duplicate symbols do not create duplicate provider calls",fetchCount===2);
+  check("scan identifies manual bounded mode",scan.manual===true&&scan.maxSymbols===20);
 
   console.log(JSON.stringify({pass,fail,failures:fail}));
   if(fail) process.exit(1);
