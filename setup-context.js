@@ -1,7 +1,7 @@
 "use strict";
 
 const advisoryModule=(typeof module!=="undefined"&&module.exports)?require("./advisory-state.js"):(globalThis.StratAdvisoryState||{});
-const deriveAdvisoryState=advisoryModule.deriveAdvisoryState;
+const deriveAdvisoryStateFn=advisoryModule.deriveAdvisoryState;
 
 function validDirection(value){
   const d=String(value||"").toUpperCase();
@@ -50,11 +50,11 @@ function buildSetupContext({
   signals=[],primarySignal=null,practiceTrade=null,carrier=null,ftfc=null,indexBreadth=null,sectorBreadth=null,
   entry=null,stop=null,target=null,minRewardRisk=2,historicalEvidence=null
 }={}){
-  if(typeof deriveAdvisoryState!=="function") throw new Error("advisory-state dependency unavailable");
+  if(typeof deriveAdvisoryStateFn!=="function") throw new Error("advisory-state dependency unavailable");
   const primary=resolvePrimarySignal({signals,primarySignal,practiceTrade});
   const signal=primary.signal;
   const direction=validDirection(signal?.direction||practiceTrade?.direction);
-  const advisory=deriveAdvisoryState({signals,practiceTrade,carrier,breadth:indexBreadth});
+  const advisory=deriveAdvisoryStateFn({signals,practiceTrade,carrier,breadth:indexBreadth});
   const rr=normalizeRR({entry:entry??signal?.triggerPrice??signal?.trigger??practiceTrade?.entryPrice,stop:stop??practiceTrade?.stopPrice,target:target??practiceTrade?.targetPrice,direction});
   const minRR=Number(minRewardRisk);
   const rrGate=rr.valid?{status:rr.rr>=(Number.isFinite(minRR)?minRR:2)?"PASS":"FAIL",minimum:Number.isFinite(minRR)?minRR:2,...rr}:{status:"UNKNOWN",minimum:Number.isFinite(minRR)?minRR:2,...rr};
