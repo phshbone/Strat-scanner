@@ -8,7 +8,7 @@
     {
       "binding": "TWELVE_DATA_API_KEY",
       "store_id": "43447ba740f94d278dd5b612ecf4d4a8",
-      "secret_name": "TWELVE_DATA_API_KEY"
+      "secret_name": "TWELVE_DATA_API_KEY_SECRET"
     }
   ]
 }
