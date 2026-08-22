@@ -21,6 +21,11 @@
     return String(a.symbol||"").toUpperCase()===String(b.symbol||"").toUpperCase()&&String(a.timeframe||"").toUpperCase()===String(b.timeframe||"").toUpperCase();
   }
 
+  function normalizePanelCount(value){
+    const n=Number(value);
+    return Number.isInteger(n)&&n>=1&&n<=4?n:1;
+  }
+
   function watchBudgetText(intervalMs=WATCH_INTERVAL_MS){
     const seconds=Math.round(Number(intervalMs)/1000);
     return `One symbol • one ${seconds}s polling request • higher chart panels update by local aggregation`;
@@ -73,11 +78,29 @@
       }catch(_){return false;}
     }
 
-    function clickCurrentChart(symbol){
+    function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+
+    async function restorePanelCount(desiredCount){
+      const desired=normalizePanelCount(desiredCount);
+      if(desired<=1) return true;
+      for(let attempt=0;attempt<40;attempt++){
+        const select=document.getElementById("chartPanelCount"),option=select?.querySelector(`option[value="${desired}"]`);
+        if(select&&option&&!option.disabled){
+          if(Number(select.value)!==desired){select.value=String(desired);select.dispatchEvent(new Event("change",{bubbles:true}));}
+          return true;
+        }
+        await wait(25);
+      }
+      return false;
+    }
+
+    async function clickCurrentChart(symbol){
+      const desiredPanelCount=normalizePanelCount(document.getElementById("chartPanelCount")?.value);
       const buttons=Array.from(document.querySelectorAll(".chartBtn"));
       const button=buttons.find(btn=>String(btn.dataset?.symbol||"").toUpperCase()===String(symbol||"").toUpperCase());
-      if(button){button.click();return true;}
-      return false;
+      if(!button) return false;
+      button.click();
+      return restorePanelCount(desiredPanelCount);
     }
 
     async function refresh(){
@@ -94,7 +117,7 @@
         const series=await live.fetchSeries({symbol:target.symbol,timeframe:target.timeframe,outputsize:100});
         const result=live.buildCandidate(series,{engine:{detectSetup},scannerCardApi:scanner,now:Date.now()});
         updateRankedCard(result.card);
-        const clicked=clickCurrentChart(target.symbol);
+        const clicked=await clickCurrentChart(target.symbol);
         const t=new Date();
         setStatus(`WATCH LIVE • ${target.symbol} ${target.timeframe}m • updated ${t.toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"})}${clicked?"":" • chart refresh unavailable"}`,clicked?"small ok":"small warn");
       }catch(error){
@@ -131,5 +154,5 @@
     return true;
   }
 
-  return {WATCH_INTERVAL_MS,SUPPORTED_TFS,normalizeWatchTarget,sameTarget,watchBudgetText,installResearchConsole};
+  return {WATCH_INTERVAL_MS,SUPPORTED_TFS,normalizeWatchTarget,sameTarget,normalizePanelCount,watchBudgetText,installResearchConsole};
 });
