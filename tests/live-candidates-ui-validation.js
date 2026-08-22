@@ -87,7 +87,7 @@ function cryptoPayload(){return {
   check("no probability is manufactured",candidate.card.probabilityScore===null);
 
   const cryptoCandidate=ui.buildCandidate(cryptoSeries,{engine:core,scannerCardApi:scanner,now:Date.parse("2026-08-22T05:05:00Z")});
-  check("crypto candidate retains market type",cryptoCandidate.card.marketType==="CRYPTO"&&cryptoCandidate.signal?.metadata?.marketType==="CRYPTO");
+  check("crypto candidate retains market type",cryptoCandidate.card.marketType==="CRYPTO"&&cryptoCandidate.series.marketType==="CRYPTO");
 
   const liveCopy=ui.consoleModeCopy("LIVE");
   check("live mode badge is explicit",liveCopy.badge==="LIVE CANDIDATES");
