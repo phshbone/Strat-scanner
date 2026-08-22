@@ -44,9 +44,18 @@ function payload(){return {
   check("RTH semantic provenance is attached",series.bars[0].semantics?.session==="REGULAR"&&series.bars[0].semantics?.barAnchor==="US_EQUITY_RTH_0930");
   check("semantic key is retained",typeof series.bars[2].semanticKey==="string"&&series.bars[2].semanticKey.includes("SPY|15"));
 
+  const continuity=ui.deriveIntradayContinuity(series);
+  check("15m stream derives 30m and 15m FTFC locally",continuity.states.map(x=>x.timeframe).join(",")==="30,15");
+  check("derived FTFC uses current price versus each period open",continuity.states.every(x=>x.currentPrice===9.8&&x.periodOpen===8));
+  check("derived 15m FTFC resolves full bullish continuity",continuity.alignment==="FULL_BULLISH");
+  check("derived FTFC is explicitly validated-intraday scope",continuity.scope==="VALIDATED_INTRADAY");
+  check("30m-only stream does not overclaim FTFC",ui.deriveIntradayContinuity({timeframe:"30",bars:[series.bars[2]]}).alignment==="NO_DATA");
+
   const candidate=ui.buildCandidate(series,{engine:core,scannerCardApi:scanner,now:Date.parse("2026-08-21T14:05:00Z")});
   check("deterministic core detects live 2-2",candidate.setup.name==="2-2"&&candidate.setup.direction==="BULLISH");
   check("live signal is actionable before source bar closes",candidate.signal?.actionable===true&&candidate.card.actionable===true);
+  check("live candidate carries derived FTFC context",candidate.card.ftfc?.alignment==="FULL_BULLISH"&&candidate.card.ftfc?.status==="ALIGNED"&&candidate.card.ftfc?.states?.length===2);
+  check("compact FTFC text is readable",ui.ftfcText(candidate.card)==="BULL 2/2");
   check("live candidate keeps R:R unknown without stop",candidate.card.rewardRisk===null&&candidate.card.rewardRiskStatus==="UNKNOWN");
   check("unknown R:R renders as dash instead of zero",ui.rewardRiskText(candidate.card)==="—");
   check("real numeric R:R still renders",ui.rewardRiskText({rewardRisk:3.83})==="3.83R");
@@ -55,9 +64,11 @@ function payload(){return {
   const liveCopy=ui.consoleModeCopy("LIVE");
   check("live mode badge is explicit",liveCopy.badge==="LIVE CANDIDATES");
   check("live mode does not claim Monitor is live",/sample Monitor/.test(liveCopy.subtitle));
+  check("live mode has broker verification guardrail",liveCopy.referencePriceNotice==="REFERENCE PRICE — VERIFY WITH BROKER");
+  check("live mode note explains zero-cost local FTFC derivation",/adds no provider calls/.test(liveCopy.note));
   check("live mode note states bounded manual scan",/capped at 20 unique symbols/.test(liveCopy.note));
   const sampleCopy=ui.consoleModeCopy("SAMPLE");
-  check("sample mode restores sample badge",sampleCopy.badge==="SAMPLE DATA");
+  check("sample mode restores sample badge",sampleCopy.badge==="SAMPLE DATA"&&sampleCopy.referencePriceNotice===null);
 
   const expired=ui.buildCandidate(series,{engine:core,scannerCardApi:scanner,now:Date.parse("2026-08-21T14:20:00Z")});
   check("expired live bar cannot stay actionable",expired.signal?.expired===true&&expired.card.actionable===false);
@@ -69,6 +80,7 @@ function payload(){return {
   const scan=await ui.scan({symbols:["SPY","QQQ","SPY"],timeframe:"15",fetchImpl:fakeFetch,engine:core,scannerCardApi:scanner,now:Date.parse("2026-08-21T14:05:00Z")});
   check("browser watchlist scan returns ranked cards",scan.requested===2&&scan.succeeded===2&&scan.cards.length===2);
   check("duplicate symbols do not create duplicate provider calls",fetchCount===2);
+  check("derived FTFC adds no provider calls",fetchCount===scan.requested);
   check("scan identifies manual bounded mode",scan.manual===true&&scan.maxSymbols===20);
 
   console.log(JSON.stringify({pass,fail,failures:fail}));
