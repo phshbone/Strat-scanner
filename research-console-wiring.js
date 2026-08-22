@@ -13,6 +13,8 @@
     if(src.includes("trade-coach-ui")) return !!window.StratTradeCoachUI;
     if(src.includes("trade-coach.js")) return !!window.StratTradeCoach;
     if(src.includes("live-candidates-ui")) return !!window.StratLiveCandidatesUI;
+    if(src.includes("chart-workspace-layout")) return !!window.StratChartWorkspace;
+    if(src.includes("chart-workspace-ui")) return !!window.StratChartWorkspaceUI;
     return true;
   }
 
@@ -164,6 +166,8 @@
       await loadScript("trade-coach.js");
       await loadScript("trade-coach-ui.js");
       await loadScript("live-candidates-ui.js");
+      await loadScript("chart-workspace-layout.js");
+      await loadScript("chart-workspace-ui.js");
       ensurePanel();
       let tries=0;
       const timer=setInterval(()=>{
@@ -172,6 +176,7 @@
           clearInterval(timer);
           updateCoach();
           if(window.StratLiveCandidatesUI) window.StratLiveCandidatesUI.installResearchConsole();
+          if(window.StratChartWorkspaceUI) window.StratChartWorkspaceUI.installResearchConsole();
         }else if(tries>200){
           clearInterval(timer);
         }
