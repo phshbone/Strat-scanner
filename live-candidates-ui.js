@@ -9,6 +9,7 @@
   const INTERVALS={"5":"5min","15":"15min","30":"30min"};
   const MAX_SCAN_SYMBOLS=20;
   const WATCHLIST_STORAGE_KEY="strat.liveCandidates.watchlist.v1";
+  const INTRADAY_CONTINUITY_LADDER={"5":["30","15","5"],"15":["30","15"],"30":["30"]};
 
   function normalizeTimeframe(value){
     const raw=String(value||"").trim().toUpperCase();
@@ -59,15 +60,30 @@
   function finiteValue(value){return value!==null&&value!==undefined&&value!==""&&Number.isFinite(Number(value));}
   function rewardRiskText(card){return finiteValue(card?.rewardRisk)?`${Number(card.rewardRisk).toFixed(2)}R`:"—";}
 
+  function ftfcText(card){
+    const ftfc=card?.ftfc||{},alignment=String(ftfc.alignment||"");
+    if(!alignment||alignment==="NO_DATA") return "—";
+    const states=Array.isArray(ftfc.states)?ftfc.states:[];
+    const total=states.length;
+    const bullish=states.filter(row=>row.state==="BULLISH").length;
+    const bearish=states.filter(row=>row.state==="BEARISH").length;
+    if(alignment==="FULL_BULLISH"||alignment==="BULLISH_MAJORITY") return total?`BULL ${bullish}/${total}`:"BULL";
+    if(alignment==="FULL_BEARISH"||alignment==="BEARISH_MAJORITY") return total?`BEAR ${bearish}/${total}`:"BEAR";
+    if(alignment==="MIXED") return "MIXED";
+    return alignment;
+  }
+
   function consoleModeCopy(mode){
     const live=String(mode||"").toUpperCase()==="LIVE";
     return live?{
       badge:"LIVE CANDIDATES",
       subtitle:"Deterministic engine monitor • live Candidates • sample Monitor",
-      note:"Live scanner cards use the deterministic scanner-card/setup-context model. Manual scans are capped at 20 unique symbols and one timeframe per run. Context supports a setup; it cannot create one."
+      referencePriceNotice:"REFERENCE PRICE — VERIFY WITH BROKER",
+      note:"Live scanner cards use the deterministic scanner-card/setup-context model. Intraday FTFC is derived locally from the same validated bar stream, so it adds no provider calls. A 30m-only scan leaves FTFC unknown until higher validated context is available. Manual scans are capped at 20 unique symbols and one timeframe per run. Context supports a setup; it cannot create one."
     }:{
       badge:"SAMPLE DATA",
       subtitle:"Deterministic engine monitor • shared setup context • sample-data mode",
+      referencePriceNotice:null,
       note:"Sample cards use the same scanner-card/setup-context model intended for Practice Mode and Trade Coach. Context supports a setup; it cannot create one."
     };
   }
@@ -116,6 +132,31 @@
     return {source:"LIVE_PROXY",provider:"TWELVE_DATA",symbol:sym,timeframe:tf,interval:INTERVALS[tf],bars};
   }
 
+  function semanticDate(bar){return String(bar?.semantics?.periodOpenId||"").split("|")[2]||null;}
+
+  function deriveIntradayContinuity(series){
+    const tf=normalizeTimeframe(series?.timeframe),bars=Array.isArray(series?.bars)?series.bars:[];
+    const current=bars.at(-1);
+    if(!current||!finiteValue(current.close)||!finiteValue(current?.semantics?.barAnchorOffsetMinutes)) return {alignment:"NO_DATA",states:[],scope:"VALIDATED_INTRADAY",sourceTimeframe:tf};
+    const price=Number(current.close),currentOffset=Number(current.semantics.barAnchorOffsetMinutes),currentDate=semanticDate(current),targets=INTRADAY_CONTINUITY_LADDER[tf]||[];
+    const states=[];
+    for(const target of targets){
+      const minutes=Number(target),bucketStart=Math.floor(currentOffset/minutes)*minutes;
+      const openingBar=bars.find(bar=>semanticDate(bar)===currentDate&&Number(bar?.semantics?.barAnchorOffsetMinutes)===bucketStart);
+      if(!openingBar||!finiteValue(openingBar.open)) continue;
+      const periodOpen=Number(openingBar.open),state=price>periodOpen?"BULLISH":price<periodOpen?"BEARISH":"FLAT";
+      states.push({timeframe:target,state,currentPrice:price,periodOpen,periodOpenTimestamp:openingBar.semantics?.barOpenTimestamp||null,source:"DERIVED_FROM_VALIDATED_INTRADAY_STREAM"});
+    }
+    if(states.length<2) return {alignment:"NO_DATA",states,scope:"VALIDATED_INTRADAY",sourceTimeframe:tf};
+    const bullish=states.filter(row=>row.state==="BULLISH").length,bearish=states.filter(row=>row.state==="BEARISH").length;
+    let alignment="MIXED";
+    if(bullish===states.length) alignment="FULL_BULLISH";
+    else if(bearish===states.length) alignment="FULL_BEARISH";
+    else if(bullish>bearish) alignment="BULLISH_MAJORITY";
+    else if(bearish>bullish) alignment="BEARISH_MAJORITY";
+    return {alignment,states,scope:"VALIDATED_INTRADAY",sourceTimeframe:tf};
+  }
+
   function buildProxyUrl({symbol,timeframe,outputsize=100,proxyBase=DEFAULT_PROXY_BASE}){
     const tf=normalizeTimeframe(timeframe),sym=normalizeSymbol(symbol),n=Number(outputsize);
     if(!Number.isInteger(n)||n<3||n>5000) throw new Error("outputsize must be an integer from 3 to 5000");
@@ -137,15 +178,16 @@
     if(!scannerCardApi||typeof scannerCardApi.buildScannerCard!=="function") throw new Error("scanner card API required");
     const bars=series?.bars||[];
     if(bars.length<3) throw new Error("at least three semantic bars required");
-    const current=bars.at(-1),price=Number(current.close),setup=engine.detectSetup(bars);
+    const current=bars.at(-1),price=Number(current.close),setup=engine.detectSetup(bars),continuity=deriveIntradayContinuity(series);
     const directional=["BULLISH","BEARISH"].includes(setup?.direction)&&Number.isFinite(Number(setup?.trigger));
     const closeAt=Date.parse(current?.semantics?.barCloseTimestamp||""),expired=Number.isFinite(closeAt)&&Number(now)>=closeAt;
     const inForce=directional?(setup.direction==="BULLISH"?price>Number(setup.trigger):price<Number(setup.trigger)):false;
     const magnitudeHit=directional&&Number.isFinite(Number(setup.magnitude))?(setup.direction==="BULLISH"?price>=Number(setup.magnitude):price<=Number(setup.magnitude)):false;
     const actionable=directional&&!expired&&inForce&&!magnitudeHit&&setup.pathResolved!==false;
     const signal=directional?{setupId:setup.name,setupFamily:setup.name,direction:setup.direction,timeframe:series.timeframe,trigger:Number(setup.trigger),magnitude:Number.isFinite(Number(setup.magnitude))?Number(setup.magnitude):null,reference:setup.reference||null,currentType:setup.currentType||null,pathResolved:setup.pathResolved!==false,dataSemantics:current.semantics||null,semanticKey:current.semanticKey||null,actionable,expired,metadata:{marketDataSource:"LIVE_PROXY",provider:"TWELVE_DATA",interval:series.interval}}:null;
-    const card=scannerCardApi.buildScannerCard({symbol:series.symbol,timeframe:series.timeframe,signals:signal?[signal]:[],primarySignal:signal,entry:signal?.trigger??null,stop:null,target:signal?.magnitude??null,observedAt:new Date(Number(now)).toISOString(),price});
-    return {series,setup,signal,card,expired,actionable};
+    const card=scannerCardApi.buildScannerCard({symbol:series.symbol,timeframe:series.timeframe,signals:signal?[signal]:[],primarySignal:signal,ftfc:continuity,entry:signal?.trigger??null,stop:null,target:signal?.magnitude??null,observedAt:new Date(Number(now)).toISOString(),price});
+    card.ftfc={...card.ftfc,states:continuity.states,scope:continuity.scope,sourceTimeframe:continuity.sourceTimeframe};
+    return {series,setup,signal,card,continuity,expired,actionable};
   }
 
   async function scan({symbols,timeframe="15",outputsize=100,fetchImpl=globalThis.fetch,engine,scannerCardApi,now=Date.now(),maxSymbols=MAX_SCAN_SYMBOLS}={}){
@@ -176,7 +218,12 @@
 
     function setConsoleMode(mode){
       const copy=consoleModeCopy(mode),badge=document.querySelector(".topbar .badge"),subtitle=document.querySelector(".topbar .subtitle");
+      let priceNotice=document.querySelector("#liveReferencePriceNotice");
+      if(!priceNotice&&subtitle?.parentNode){
+        priceNotice=document.createElement("div");priceNotice.id="liveReferencePriceNotice";priceNotice.className="small warn";priceNotice.style.cssText="margin-top:4px;font-weight:900;letter-spacing:.04em";priceNotice.title="Twelve Data reference feed. Confirm execution price in your broker before trading.";subtitle.parentNode.appendChild(priceNotice);
+      }
       if(badge) badge.textContent=copy.badge;if(subtitle) subtitle.textContent=copy.subtitle;if(candidateNote) candidateNote.textContent=copy.note;
+      if(priceNotice){priceNotice.textContent=copy.referencePriceNotice||"";priceNotice.hidden=!copy.referencePriceNotice;}
     }
 
     function renderLive(){
@@ -185,7 +232,7 @@
       const d=document.querySelector("#directionFilter")?.value||"ALL",s=document.querySelector("#statusFilter")?.value||"ALL";
       const rows=rankedCards.filter(c=>(d==="ALL"||(d==="NONE"?!c.direction:c.direction===d))&&(s==="ALL"||c.advisoryState===s));
       const esc2=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])),fmt2=n=>finiteValue(n)?`$${Number(n).toFixed(2)}`:"—",st=c=>c.advisoryState==="ACTIVE_TRADE_CONTEXT"?"ACTIVE":c.advisoryState==="WATCH_ACTIONABLE_SETUP"?"WATCH":"WAIT",body=document.querySelector("#candidateBody");
-      body.innerHTML=rows.map(c=>{const rank=rankedCards.indexOf(c)+1;return `<tr><td>${rank}</td><td><strong>${esc2(c.symbol)}</strong></td><td class="${c.direction==="BULLISH"?"ok":c.direction==="BEARISH"?"bad":"warn"}">${esc2(c.direction||"—")}</td><td>${fmt2(c.price)}</td><td>${esc2(c.timeframe)}</td><td>${esc2(c.setup||"—")}</td><td>${esc2(c.ftfc?.alignment||"—")}</td><td>${esc2(c.breadth?.index?.context||"—")}</td><td>${esc2(c.breadth?.sector?.context||"—")}</td><td class="${c.rewardRiskStatus==="PASS"?"ok":c.rewardRiskStatus==="FAIL"?"bad":"warn"}">${rewardRiskText(c)}</td><td><span class="statusPill ${st(c)==="WAIT"?"warn":"ok"}">${st(c)}</span></td><td><button class="btn tiny secondary whyBtn" data-symbol="${esc2(c.symbol)}">Why?</button></td></tr>`}).join("");
+      body.innerHTML=rows.map(c=>{const rank=rankedCards.indexOf(c)+1;return `<tr><td>${rank}</td><td><strong>${esc2(c.symbol)}</strong></td><td class="${c.direction==="BULLISH"?"ok":c.direction==="BEARISH"?"bad":"warn"}">${esc2(c.direction||"—")}</td><td>${fmt2(c.price)}</td><td>${esc2(c.timeframe)}</td><td>${esc2(c.setup||"—")}</td><td>${esc2(ftfcText(c))}</td><td>${esc2(c.breadth?.index?.context||"—")}</td><td>${esc2(c.breadth?.sector?.context||"—")}</td><td class="${c.rewardRiskStatus==="PASS"?"ok":c.rewardRiskStatus==="FAIL"?"bad":"warn"}">${rewardRiskText(c)}</td><td><span class="statusPill ${st(c)==="WAIT"?"warn":"ok"}">${st(c)}</span></td><td><button class="btn tiny secondary whyBtn" data-symbol="${esc2(c.symbol)}">Why?</button></td></tr>`}).join("");
       document.querySelectorAll(".whyBtn").forEach(btn=>btn.addEventListener("click",()=>showWhy(btn.dataset.symbol)));
       if(!rows.length) body.innerHTML='<tr><td colspan="12" class="small">No live cards match this filter.</td></tr>';
     }
@@ -233,5 +280,5 @@
     return true;
   }
 
-  return {DEFAULT_PROXY_BASE,INTERVALS,MAX_SCAN_SYMBOLS,WATCHLIST_STORAGE_KEY,normalizeTimeframe,normalizeSymbol,prepareSymbolList,isLoadShortcut,buildSavedWatchlist,parseSavedWatchlist,finiteValue,rewardRiskText,consoleModeCopy,parseUtc,attachSemantics,normalizePayload,buildProxyUrl,fetchSeries,buildCandidate,scan,installResearchConsole};
+  return {DEFAULT_PROXY_BASE,INTERVALS,MAX_SCAN_SYMBOLS,WATCHLIST_STORAGE_KEY,INTRADAY_CONTINUITY_LADDER,normalizeTimeframe,normalizeSymbol,prepareSymbolList,isLoadShortcut,buildSavedWatchlist,parseSavedWatchlist,finiteValue,rewardRiskText,ftfcText,consoleModeCopy,parseUtc,nyParts,attachSemantics,normalizePayload,semanticDate,deriveIntradayContinuity,buildProxyUrl,fetchSeries,buildCandidate,scan,installResearchConsole};
 });
