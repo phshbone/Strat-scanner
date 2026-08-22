@@ -30,7 +30,9 @@ function json(data,status=200,origin=null){
 
 function normalizeSymbol(value){
   const symbol=String(value||"").trim().toUpperCase();
-  if(!symbol || !/^[A-Z0-9.\-]{1,20}$/.test(symbol)) throw new Error("invalid symbol");
+  const standard=/^[A-Z0-9.\-]{1,20}$/.test(symbol);
+  const crypto=/^[A-Z0-9.\-]{1,15}\/[A-Z0-9.\-]{1,15}$/.test(symbol);
+  if(!symbol || (!standard&&!crypto)) throw new Error("invalid symbol");
   return symbol;
 }
 
