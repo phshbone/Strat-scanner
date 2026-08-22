@@ -2,11 +2,12 @@ import worker,{buildProviderUrl,getApiKey,normalizeSymbol,normalizeInterval,norm
 
 let pass=0,fail=0; const failures=[];
 function t(name,actual,expected){const ok=JSON.stringify(actual)===JSON.stringify(expected); if(ok) pass++; else {fail++; failures.push({name,actual,expected});}}
-
 function throws(name,fn){let did=false; try{fn();}catch{did=true;} t(name,did,true);}
 
 t("symbol normalized",normalizeSymbol(" spy "),"SPY");
+t("crypto pair normalized",normalizeSymbol(" btc/usd "),"BTC/USD");
 throws("bad symbol rejected",()=>normalizeSymbol("SPY&apikey=x"));
+throws("malformed crypto pair rejected",()=>normalizeSymbol("BTC//USD"));
 t("1h accepted",normalizeInterval("1h"),"1h");
 throws("unsupported interval rejected",()=>normalizeInterval("2h"));
 t("outputsize normalized",normalizeOutputsize("5000"),5000);
@@ -26,6 +27,10 @@ t("secret inserted server-side",url.searchParams.get("apikey"),"SECRET");
 t("intraday UTC",url.searchParams.get("timezone"),"UTC");
 t("ascending order",url.searchParams.get("order"),"ASC");
 t("outputsize preserved",url.searchParams.get("outputsize"),"250");
+
+url=buildProviderUrl("https://worker.example/time-series?symbol=BTC%2FUSD&interval=15min&outputsize=100","SECRET");
+t("crypto pair preserved upstream",url.searchParams.get("symbol"),"BTC/USD");
+t("crypto intraday remains UTC",url.searchParams.get("timezone"),"UTC");
 
 url=buildProviderUrl("https://worker.example/time-series?symbol=SPY&interval=1day","SECRET");
 t("daily no forced UTC",url.searchParams.has("timezone"),false);
