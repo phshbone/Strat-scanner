@@ -106,8 +106,9 @@
     if(typeof window==="undefined"||typeof document==="undefined"||window.__stratChartTradeCoachInstalled) return false;
     window.__stratChartTradeCoachInstalled=true;
     let previous=null,lastGuidance=null;
-    window.addEventListener(EVENT_NAME,event=>{
-      const handoff=event?.detail||window.__stratChartWorkspaceHandoff||null;if(!handoff) return;
+
+    function processHandoff(handoff){
+      if(!handoff) return false;
       const current=deriveChartSnapshot(handoff);
       if(!previous||previous.key!==current.key){previous=null;lastGuidance=null;}
       let guidance=meaningfulChartGuidance(previous,current);
@@ -117,8 +118,13 @@
       }
       if(guidance){lastGuidance=guidance;renderGuidance(guidance,true);}else if(lastGuidance) renderGuidance(lastGuidance,false);
       previous=current;
-    });
-    ensureSurface();return true;
+      return true;
+    }
+
+    window.addEventListener(EVENT_NAME,event=>processHandoff(event?.detail||window.__stratChartWorkspaceHandoff||null));
+    ensureSurface();
+    if(window.__stratChartWorkspaceHandoff) processHandoff(window.__stratChartWorkspaceHandoff);
+    return true;
   }
 
   return {EVENT_NAME,finite,targetKey,latestClose,deriveChartSnapshot,meaningfulChartGuidance,severityClass,ensureSurface,renderGuidance,installResearchConsole};
