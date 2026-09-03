@@ -11,6 +11,7 @@ on:
       - 'chart-live-watch.js'
       - 'chart-preferences.js'
       - 'chart-analysis-overlays.js'
+      - 'chart-trade-coach.js'
       - 'research-console-wiring.js'
       - 'ui-cleanup.js'
       - 'worker/**'
