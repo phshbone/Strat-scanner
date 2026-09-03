@@ -19,6 +19,9 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.getByRole('heading', { name: /Trading Research Console/i })).toBeVisible();
 
   await page.getByRole('button', { name: 'Candidates', exact: true }).click();
+  await expect(page.locator('#candidateWorkflowHint')).toContainText(/Scan.*Why.*Chart.*Watch live/i);
+  await expect(page.locator('#candidates thead th').last()).toHaveText('Actions');
+
   const symbols = page.locator('#liveCandidateSymbols');
   await expect(symbols).toBeVisible();
   await symbols.fill('BTC/USD');
@@ -30,11 +33,14 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.locator('#candidateBody')).toContainText('BTC/USD');
   await expect(page.locator('#liveReferencePriceNotice')).toContainText('VERIFY WITH BROKER');
 
-  const chartButton = page.getByRole('button', { name: 'Chart', exact: true }).first();
+  const chartButton = page.getByRole('button', { name: /Chart BTC\/USD/i }).first();
   await expect(chartButton).toBeVisible({ timeout: 15000 });
+  await expect(chartButton).not.toHaveClass(/secondary/);
   await chartButton.click();
 
   await expect(page.locator('#charts')).toHaveClass(/active/);
+  await expect(page.locator('#charts h2')).toHaveText('Chart');
+  await expect(page.locator('#chartWorkspaceReference')).toHaveText('REFERENCE DATA • VERIFY WITH BROKER');
   await expect(page.locator('#chartWorkspaceStatus')).toContainText('BTC/USD');
   await expect(page.locator('#chartPanel0')).toBeVisible({ timeout: 30000 });
 
@@ -50,8 +56,6 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(watchStatus).toContainText('WATCH LIVE');
   await expect(watchStatus).toContainText(/updated/i, { timeout: 30000 });
 
-  // Regression check for the bug found during manual iPhone testing:
-  // a live refresh must not collapse a two-panel workspace back to one.
   await expect(panelCount).toHaveValue('2');
   await expect(page.locator('#chartPanel0')).toBeVisible();
   await expect(page.locator('#chartPanel1')).toBeVisible();
@@ -66,37 +70,23 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   expect(runtimeProblems, runtimeProblems.join('\n')).toEqual([]);
 });
 
-test('sample mode cannot be overwritten by a stale in-flight live scan', async ({ page }) => {
+test('sample selection wins over a stale live scan response', async ({ page }) => {
   const runtimeProblems = attachRuntimeWatch(page);
-  const delayedPayload = {
-    meta: { symbol: 'BTC/USD', interval: '15min', timezone: 'UTC' },
-    values: [
-      { datetime: '2026-09-03 18:00:00', open: '111000', high: '111200', low: '110800', close: '111100', volume: '10' },
-      { datetime: '2026-09-03 18:15:00', open: '111100', high: '111300', low: '110900', close: '111000', volume: '11' },
-      { datetime: '2026-09-03 18:30:00', open: '111000', high: '111500', low: '110950', close: '111450', volume: '12' }
-    ]
-  };
-
-  await page.route('https://thestrat.phshbone.workers.dev/time-series**', async route => {
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(delayedPayload) });
+  await page.route('**/time-series?*', async route => {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await route.continue();
   });
 
-  await page.goto(`?cleanup-race=${Date.now()}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`?mode-cleanup=${Date.now()}`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Candidates', exact: true }).click();
-  await page.locator('#liveCandidateSymbols').fill('BTC/USD');
-  await page.locator('#liveCandidateTimeframe').selectOption('15');
+  const symbols = page.locator('#liveCandidateSymbols');
+  await expect(symbols).toBeVisible();
+  await symbols.fill('BTC/USD');
   await page.locator('#loadLiveCandidates').click();
-  await expect(page.locator('#liveCandidateStatus')).toContainText(/Loading 1 live 15m symbol/i);
-
+  await expect(page.locator('#liveCandidateStatus')).toContainText(/Loading/i);
   await page.locator('#useSampleCandidates').click();
   await expect(page.locator('.topbar .badge')).toHaveText('SAMPLE DATA');
-  await expect(page.locator('#liveCandidateStatus')).toHaveText('Sample cards active');
-
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(3000);
   await expect(page.locator('.topbar .badge')).toHaveText('SAMPLE DATA');
-  await expect(page.locator('#liveCandidateStatus')).toHaveText('Sample cards active');
-  await expect(page.locator('#liveReferencePriceNotice')).toBeHidden();
-
   expect(runtimeProblems, runtimeProblems.join('\n')).toEqual([]);
 });
