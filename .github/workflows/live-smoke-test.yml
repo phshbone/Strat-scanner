@@ -10,6 +10,7 @@ on:
       - 'chart-workspace-ui.js'
       - 'chart-live-watch.js'
       - 'chart-preferences.js'
+      - 'chart-analysis-overlays.js'
       - 'research-console-wiring.js'
       - 'ui-cleanup.js'
       - 'worker/**'
