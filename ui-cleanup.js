@@ -7,6 +7,13 @@
 })(typeof globalThis!=="undefined"?globalThis:this,function(){
   const STYLE_ID="stratUiCleanupStyles";
 
+  function setText(el,text){
+    if(el&&el.textContent!==text) el.textContent=text;
+  }
+  function setAttr(el,name,value){
+    if(el&&el.getAttribute(name)!==value) el.setAttribute(name,value);
+  }
+
   function injectStyles(){
     if(typeof document==="undefined"||document.getElementById(STYLE_ID)) return false;
     const style=document.createElement("style");
@@ -61,13 +68,15 @@
     const table=document.querySelector("#candidates table");
     if(!table) return false;
     const headers=Array.from(table.querySelectorAll("thead th"));
-    const last=headers.at(-1);
-    if(last) last.textContent="Actions";
-    document.querySelectorAll("#candidateBody .whyBtn").forEach(button=>{button.textContent="Why";button.setAttribute("aria-label",`Why ${button.dataset?.symbol||"candidate"}`);});
+    setText(headers.at(-1),"Actions");
+    document.querySelectorAll("#candidateBody .whyBtn").forEach(button=>{
+      setText(button,"Why");
+      setAttr(button,"aria-label",`Why ${button.dataset?.symbol||"candidate"}`);
+    });
     document.querySelectorAll("#candidateBody .chartBtn").forEach(button=>{
-      button.classList.remove("secondary");
-      button.setAttribute("aria-label",`Chart ${button.dataset?.symbol||"candidate"}`);
-      button.title="Open chart workspace";
+      if(button.classList.contains("secondary")) button.classList.remove("secondary");
+      setAttr(button,"aria-label",`Chart ${button.dataset?.symbol||"candidate"}`);
+      setAttr(button,"title","Open chart workspace");
     });
     return true;
   }
@@ -75,15 +84,14 @@
   function cleanChartWorkspace(){
     const charts=document.getElementById("charts");
     if(!charts) return false;
-    const heading=charts.querySelector("h2");
-    if(heading) heading.textContent="Chart";
+    setText(charts.querySelector("h2"),"Chart");
     const reference=document.getElementById("chartWorkspaceReference");
     if(reference){
-      reference.textContent="REFERENCE DATA • VERIFY WITH BROKER";
-      reference.title="Charts use the same scanner response. No independent market-data request is made. Confirm execution price in your broker before trading.";
+      setText(reference,"REFERENCE DATA • VERIFY WITH BROKER");
+      setAttr(reference,"title","Charts use the same scanner response. No independent market-data request is made. Confirm execution price in your broker before trading.");
     }
     const status=document.getElementById("chartWorkspaceStatus");
-    if(status&&/Select Chart from a live Candidate/i.test(status.textContent||"")) status.textContent="Open Chart from a live candidate to inspect the exact scanner bars.";
+    if(status&&/Select Chart from a live Candidate/i.test(status.textContent||"")) setText(status,"Open Chart from a live candidate to inspect the exact scanner bars.");
     return true;
   }
 
@@ -98,11 +106,11 @@
     if(typeof window==="undefined"||typeof document==="undefined"||window.__stratUiCleanupInstalled) return false;
     window.__stratUiCleanupInstalled=true;
     refresh();
-    const observer=new MutationObserver(refresh);
+    const observer=new MutationObserver(()=>refresh());
     observer.observe(document.body,{childList:true,subtree:true});
     window.__stratUiCleanupObserver=observer;
     return true;
   }
 
-  return {STYLE_ID,injectStyles,ensureCandidateHints,cleanCandidateTable,cleanChartWorkspace,refresh,installResearchConsole};
+  return {STYLE_ID,setText,setAttr,injectStyles,ensureCandidateHints,cleanCandidateTable,cleanChartWorkspace,refresh,installResearchConsole};
 });
