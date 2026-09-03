@@ -9,6 +9,7 @@ on:
       - 'live-candidates-ui.js'
       - 'chart-workspace-ui.js'
       - 'chart-live-watch.js'
+      - 'chart-preferences.js'
       - 'research-console-wiring.js'
       - 'ui-cleanup.js'
       - 'worker/**'
