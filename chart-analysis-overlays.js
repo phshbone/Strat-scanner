@@ -13,11 +13,7 @@
   function finite(value){return value!==null&&value!==undefined&&value!==""&&Number.isFinite(Number(value));}
   function normalize(value){
     const source=value&&typeof value==="object"?value:{};
-    return {
-      volume:source.volume!==false,
-      stratLabels:source.stratLabels!==false,
-      setupLevels:source.setupLevels!==false
-    };
+    return {volume:source.volume!==false,stratLabels:source.stratLabels!==false,setupLevels:source.setupLevels!==false};
   }
   function load(){
     if(typeof window==="undefined") return {...prefs};
@@ -76,18 +72,12 @@
     try{setup=detectSetupFn(bars,{})||null;}catch(_){setup=null;}
     const direction=String(setup?.direction||"").toUpperCase();
     if(!["BULLISH","BEARISH"].includes(direction)) return {trigger:null,target:null,direction:null,setup:setup?.name||null};
-    return {
-      trigger:finite(setup?.trigger)?Number(setup.trigger):null,
-      target:finite(setup?.magnitude)?Number(setup.magnitude):null,
-      direction,
-      setup:setup?.name||null
-    };
+    return {trigger:finite(setup?.trigger)?Number(setup.trigger):null,target:finite(setup?.magnitude)?Number(setup.magnitude):null,direction,setup:setup?.name||null};
   }
 
   function workspacePanels(){
     if(typeof window==="undefined") return [];
-    const handoff=window.__stratChartWorkspaceHandoff;
-    const api=window.StratChartWorkspaceUI;
+    const handoff=window.__stratChartWorkspaceHandoff,api=window.StratChartWorkspaceUI;
     if(!handoff?.series||!api?.panelSeriesForWorkspace) return [];
     const timeframes=handoff?.workspace?.timeframes||[handoff.series.timeframe];
     try{return api.panelSeriesForWorkspace(handoff.series,timeframes);}catch(_){return [];}
@@ -98,16 +88,13 @@
     const data=volumeData(series);if(!data.length) return false;
     try{
       const histogram=chart.addHistogramSeries({priceFormat:{type:"volume"},priceScaleId:"",lastValueVisible:false,priceLineVisible:false});
-      histogram.priceScale().applyOptions({scaleMargins:{top:0.78,bottom:0}});
-      histogram.setData(data);
-      return true;
+      histogram.priceScale().applyOptions({scaleMargins:{top:0.78,bottom:0}});histogram.setData(data);return true;
     }catch(_){return false;}
   }
 
   function addStratLabelsAndLevels(chart,series,isExact){
     if((!prefs.stratLabels&&!prefs.setupLevels)||typeof chart?.addLineSeries!=="function") return false;
-    const api=window.StratChartWorkspaceUI;
-    const data=api?.chartDataFromSeries?api.chartDataFromSeries(series):[];
+    const api=window.StratChartWorkspaceUI,data=api?.chartDataFromSeries?api.chartDataFromSeries(series):[];
     if(!data.length) return false;
     try{
       const helper=chart.addLineSeries({color:"rgba(0,0,0,0)",lineVisible:false,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
@@ -124,17 +111,21 @@
 
   function decorateCharts(){
     if(typeof window==="undefined") return 0;
-    const charts=Array.isArray(window.__stratLightweightCharts)?window.__stratLightweightCharts:[];
-    const panels=workspacePanels();
+    const charts=Array.isArray(window.__stratLightweightCharts)?window.__stratLightweightCharts:[],panels=workspacePanels();
     let count=0;
     for(let i=0;i<charts.length;i++){
       const chart=charts[i],panel=panels[i];
       if(!chart||!panel||decoratedCharts.has(chart)) continue;
-      addVolume(chart,panel.series);
-      addStratLabelsAndLevels(chart,panel.series,panel.mode==="EXACT");
-      decoratedCharts.add(chart);count++;
+      addVolume(chart,panel.series);addStratLabelsAndLevels(chart,panel.series,panel.mode==="EXACT");decoratedCharts.add(chart);count++;
     }
     return count;
+  }
+
+  function requestRerender(){
+    if(typeof document==="undefined") return false;
+    const panelCount=document.getElementById("chartPanelCount");
+    if(panelCount){panelCount.dispatchEvent(new Event("change",{bubbles:true}));return true;}
+    setTimeout(decorateCharts,0);return false;
   }
 
   function ensureControls(){
@@ -147,12 +138,7 @@
       group.innerHTML='<label class="checkrow" style="padding:0"><input id="chartVolumeVisible" type="checkbox"> Volume</label><label class="checkrow" style="padding:0"><input id="chartStratLabelsVisible" type="checkbox"> Strat labels</label><label class="checkrow" style="padding:0"><input id="chartSetupLevelsVisible" type="checkbox"> Trigger / magnitude</label>';
       host.appendChild(group);
       const volume=group.querySelector("#chartVolumeVisible"),labels=group.querySelector("#chartStratLabelsVisible"),levels=group.querySelector("#chartSetupLevelsVisible");
-      const rerender=()=>{
-        save({volume:volume.checked,stratLabels:labels.checked,setupLevels:levels.checked});
-        const handoff=window.__stratChartWorkspaceHandoff;
-        if(handoff&&typeof window.StratChartWorkspaceUI?.renderWorkspacePanels==="function") window.StratChartWorkspaceUI.renderWorkspacePanels(handoff,handoff.workspace?.timeframes||[handoff.series?.timeframe]);
-        else setTimeout(decorateCharts,0);
-      };
+      const rerender=()=>{save({volume:volume.checked,stratLabels:labels.checked,setupLevels:levels.checked});requestRerender();};
       volume.addEventListener("change",rerender);labels.addEventListener("change",rerender);levels.addEventListener("change",rerender);
     }
     const volume=group.querySelector("#chartVolumeVisible"),labels=group.querySelector("#chartStratLabelsVisible"),levels=group.querySelector("#chartSetupLevelsVisible");
@@ -166,9 +152,8 @@
     if(typeof window==="undefined"||typeof document==="undefined"||window.__stratChartAnalysisOverlaysInstalled) return false;
     window.__stratChartAnalysisOverlaysInstalled=true;load();refresh();
     const target=document.getElementById("charts")||document.body;
-    const observer=new MutationObserver(()=>refresh());observer.observe(target,{childList:true,subtree:true});window.__stratChartAnalysisOverlaysObserver=observer;
-    return true;
+    const observer=new MutationObserver(()=>refresh());observer.observe(target,{childList:true,subtree:true});window.__stratChartAnalysisOverlaysObserver=observer;return true;
   }
 
-  return {STORAGE_KEY,DEFAULTS,normalize,load,save,classifyBar,timestampForBar,volumeData,stratMarkers,setupLevels,decorateCharts,ensureControls,refresh,installResearchConsole};
+  return {STORAGE_KEY,DEFAULTS,normalize,load,save,classifyBar,timestampForBar,volumeData,stratMarkers,setupLevels,decorateCharts,requestRerender,ensureControls,refresh,installResearchConsole};
 });
