@@ -57,6 +57,17 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.locator('#chartWorkspaceStatus')).toContainText('BTC/USD');
   await expect(page.locator('#chartPanel0')).toBeVisible({ timeout: 30000 });
 
+  const tradeCoach = page.locator('#chartTradeCoach');
+  await expect(tradeCoach).toBeVisible({ timeout: 15000 });
+  await expect(tradeCoach).toContainText('Trade Coach');
+  await expect(tradeCoach).toContainText('RULE-BASED');
+  await expect(page.locator('#chartTradeCoachMessage')).toContainText('Current setup context');
+  await page.locator('#chartTradeCoachWhy').click();
+  await expect(page.locator('#chartTradeCoachWhyPanel')).toContainText('SETUP');
+  await expect(page.locator('#chartTradeCoachWhyPanel')).toContainText('PRICE');
+  await expect(page.locator('#chartTradeCoachWhyPanel')).toContainText('TRIGGER');
+  await expect(page.locator('#chartTradeCoachWhyPanel')).toContainText('MAGNITUDE');
+
   const panelCount = page.locator('#chartPanelCount');
   await expect(panelCount).toBeVisible();
   await panelCount.selectOption('2');
@@ -99,6 +110,8 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.locator('#chartVolumeVisible')).toBeChecked();
   await expect(page.locator('#chartStratLabelsVisible')).not.toBeChecked();
   await expect(page.locator('#chartSetupLevelsVisible')).toBeChecked();
+  await expect(page.locator('#chartTradeCoach')).toContainText('RULE-BASED');
+  await expect(page.locator('#chartTradeCoachMessage')).not.toContainText('Waiting for chart context');
 
   await page.waitForTimeout(17000);
   await expect(panelCount).toHaveValue('2');
@@ -106,6 +119,7 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.locator('#chartBarSpacing')).toHaveValue('WIDE');
   await expect(page.locator('#chartGridVisible')).not.toBeChecked();
   await expect(page.locator('#chartStratLabelsVisible')).not.toBeChecked();
+  await expect(page.locator('#chartTradeCoachMessage')).not.toContainText('Waiting for chart context');
 
   if (testInfo.project.name.includes('mobile-')) {
     const bodyOverflow = await page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - window.innerWidth));
