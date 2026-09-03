@@ -16,6 +16,7 @@
     if(src.includes("chart-workspace-layout")) return !!window.StratChartWorkspace;
     if(src.includes("chart-workspace-ui")) return !!window.StratChartWorkspaceUI;
     if(src.includes("chart-live-watch")) return !!window.StratChartLiveWatch;
+    if(src.includes("chart-preferences")) return !!window.StratChartPreferences;
     if(src.includes("ui-cleanup")) return !!window.StratUICleanup;
     return true;
   }
@@ -171,6 +172,7 @@
       await loadScript("chart-workspace-layout.js");
       await loadScript("chart-workspace-ui.js");
       await loadScript("chart-live-watch.js");
+      await loadScript("chart-preferences.js");
       await loadScript("ui-cleanup.js");
       ensurePanel();
       let tries=0;
@@ -182,6 +184,7 @@
           if(window.StratLiveCandidatesUI) window.StratLiveCandidatesUI.installResearchConsole();
           if(window.StratChartWorkspaceUI) window.StratChartWorkspaceUI.installResearchConsole();
           if(window.StratChartLiveWatch) window.StratChartLiveWatch.installResearchConsole();
+          if(window.StratChartPreferences) window.StratChartPreferences.installResearchConsole();
           if(window.StratUICleanup) window.StratUICleanup.installResearchConsole();
         }else if(tries>200){
           clearInterval(timer);
