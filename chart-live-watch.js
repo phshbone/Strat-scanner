@@ -7,6 +7,7 @@
 })(typeof globalThis!=="undefined"?globalThis:this,function(){
   const WATCH_INTERVAL_MS=15000;
   const SUPPORTED_TFS=Object.freeze(["5","15","30"]);
+  const CHART_EVENT_NAME="strat:candidate-chart";
 
   function normalizeWatchTarget(handoff){
     const symbol=String(handoff?.candidate?.symbol||"").trim().toUpperCase();
@@ -86,7 +87,10 @@
       for(let attempt=0;attempt<40;attempt++){
         const select=document.getElementById("chartPanelCount"),option=select?.querySelector(`option[value="${desired}"]`);
         if(select&&option&&!option.disabled){
-          if(Number(select.value)!==desired){select.value=String(desired);select.dispatchEvent(new Event("change",{bubbles:true}));}
+          if(Number(select.value)!==desired){
+            select.value=String(desired);
+            select.dispatchEvent(new Event("change",{bubbles:true}));
+          }
           return true;
         }
         await wait(25);
@@ -94,12 +98,38 @@
       return false;
     }
 
+    function waitForFreshChartHandoff(previousHandoff,symbol,timeframe,timeoutMs=4000){
+      return new Promise(resolve=>{
+        let settled=false,timerId=null;
+        const finish=value=>{
+          if(settled) return;
+          settled=true;
+          window.removeEventListener(CHART_EVENT_NAME,onHandoff);
+          if(timerId) clearTimeout(timerId);
+          resolve(value);
+        };
+        const onHandoff=event=>{
+          const handoff=event?.detail||null;
+          if(!handoff||handoff===previousHandoff) return;
+          let next=null;
+          try{next=normalizeWatchTarget(handoff);}catch(_){return;}
+          if(next.symbol===String(symbol||"").toUpperCase()&&next.timeframe===String(timeframe||"").toUpperCase()) finish(handoff);
+        };
+        window.addEventListener(CHART_EVENT_NAME,onHandoff);
+        timerId=setTimeout(()=>finish(null),timeoutMs);
+      });
+    }
+
     async function clickCurrentChart(symbol){
       const desiredPanelCount=normalizePanelCount(document.getElementById("chartPanelCount")?.value);
       const buttons=Array.from(document.querySelectorAll(".chartBtn"));
       const button=buttons.find(btn=>String(btn.dataset?.symbol||"").toUpperCase()===String(symbol||"").toUpperCase());
       if(!button) return false;
+      const previousHandoff=window.__stratChartWorkspaceHandoff||null;
+      const handoffReady=waitForFreshChartHandoff(previousHandoff,symbol,target?.timeframe);
       button.click();
+      const freshHandoff=await handoffReady;
+      if(!freshHandoff) return false;
       return restorePanelCount(desiredPanelCount);
     }
 
@@ -133,7 +163,7 @@
       if(active&&!timer) timer=setInterval(refresh,WATCH_INTERVAL_MS);
     }
 
-    window.addEventListener("strat:candidate-chart",event=>{
+    window.addEventListener(CHART_EVENT_NAME,event=>{
       const handoff=event?.detail||window.__stratChartWorkspaceHandoff||null;
       let next=null;
       try{next=normalizeWatchTarget(handoff);}catch(_){ }
@@ -154,5 +184,5 @@
     return true;
   }
 
-  return {WATCH_INTERVAL_MS,SUPPORTED_TFS,normalizeWatchTarget,sameTarget,normalizePanelCount,watchBudgetText,installResearchConsole};
+  return {WATCH_INTERVAL_MS,SUPPORTED_TFS,CHART_EVENT_NAME,normalizeWatchTarget,sameTarget,normalizePanelCount,watchBudgetText,installResearchConsole};
 });
