@@ -184,12 +184,14 @@
   function installResearchConsole(){
     if(typeof document==="undefined"||typeof window==="undefined"||window.__stratLiveCandidatesInstalled) return false;
     if(typeof renderCandidates!=="function"||typeof sampleScannerCards!=="function"||!window.StratScannerCard||typeof detectSetup!=="function") return false;
-    window.__stratLiveCandidatesInstalled=true;const originalRenderCandidates=renderCandidates;let liveCards=null;
+    window.__stratLiveCandidatesInstalled=true;const originalRenderCandidates=renderCandidates;let liveCards=null,loadGeneration=0;
     const card=document.querySelector("#candidates .card"),toolbar=document.querySelector("#candidates .toolbar");if(!card||!toolbar) return false;
     const controls=document.createElement("div");controls.className="toolbar";
     controls.innerHTML='<input id="liveCandidateSymbols" value="SPY,QQQ,IWM" aria-label="Live candidate symbols" style="min-width:180px"><select id="liveCandidateTimeframe" aria-label="Live candidate timeframe"><option value="5">5m</option><option value="15" selected>15m</option><option value="30">30m</option></select><button class="btn" id="loadLiveCandidates" type="button">Load live</button><button class="btn secondary" id="saveLiveWatchlist" type="button">Save list</button><button class="btn secondary" id="loadSavedWatchlist" type="button">Load saved</button><button class="btn secondary" id="useSampleCandidates" type="button">Use sample</button><span id="liveCandidateStatus" class="small">Sample cards active</span><span id="liveCandidateBudget" class="small">Enter = Load live • max 20 unique symbols • one timeframe • stocks or crypto pairs like BTC/USD • no auto-refresh</span>';
     toolbar.parentNode.insertBefore(controls,toolbar);const heading=card.querySelector("h2");if(heading) heading.textContent="Candidate Ranking — Deterministic Scanner";
     const candidateNote=Array.from(card.querySelectorAll(".small")).at(-1)||null,symbolsInput=document.querySelector("#liveCandidateSymbols"),timeframeSelect=document.querySelector("#liveCandidateTimeframe"),loadButton=document.querySelector("#loadLiveCandidates"),status=document.querySelector("#liveCandidateStatus");
+
+    function clearWhyPanel(){const panel=document.querySelector("#whyPanel");if(panel){panel.hidden=true;panel.innerHTML="";}}
 
     function setConsoleMode(mode){
       const copy=consoleModeCopy(mode),badge=document.querySelector(".topbar .badge"),subtitle=document.querySelector(".topbar .subtitle");let priceNotice=document.querySelector("#liveReferencePriceNotice");
@@ -208,14 +210,19 @@
 
     async function loadLive(){
       if(loadButton.disabled) return;let symbols;try{symbols=prepareSymbolList(symbolsInput.value);}catch(error){status.textContent=error.message;status.className="small bad";return;}
-      const timeframe=timeframeSelect.value;status.textContent=`Loading ${symbols.length} live ${timeframe}m symbols…`;status.className="small warn";loadButton.disabled=true;
-      try{const result=await scan({symbols,timeframe,engine:{detectSetup},scannerCardApi:window.StratScannerCard,now:Date.now()});liveCards=result.cards;renderCandidates();setConsoleMode("LIVE");status.textContent=`LIVE PROXY • ${result.succeeded}/${result.requested} loaded${result.failed?` • ${result.failed} failed`:""}`;status.className=result.failed?"small warn":"small ok";}catch(error){status.textContent=`Live scan failed: ${error.message}`;status.className="small bad";}finally{loadButton.disabled=false;}
+      const generation=++loadGeneration,timeframe=timeframeSelect.value;clearWhyPanel();status.textContent=`Loading ${symbols.length} live ${timeframe}m symbols…`;status.className="small warn";loadButton.disabled=true;
+      try{
+        const result=await scan({symbols,timeframe,engine:{detectSetup},scannerCardApi:window.StratScannerCard,now:Date.now()});
+        if(generation!==loadGeneration) return;
+        liveCards=result.cards;renderCandidates();setConsoleMode("LIVE");status.textContent=`LIVE PROXY • ${result.succeeded}/${result.requested} loaded${result.failed?` • ${result.failed} failed`:""}`;status.className=result.failed?"small warn":"small ok";
+      }catch(error){if(generation===loadGeneration){status.textContent=`Live scan failed: ${error.message}`;status.className="small bad";}}
+      finally{loadButton.disabled=false;}
     }
 
     loadButton.addEventListener("click",loadLive);symbolsInput.addEventListener("keydown",event=>{if(!isLoadShortcut(event)) return;event.preventDefault();loadButton.click();});
     document.querySelector("#saveLiveWatchlist").addEventListener("click",()=>{try{const record=buildSavedWatchlist(symbolsInput.value,timeframeSelect.value);window.localStorage.setItem(WATCHLIST_STORAGE_KEY,JSON.stringify(record));symbolsInput.value=record.symbols.join(",");status.textContent=`Saved ${record.symbols.length} symbols • ${record.timeframe}m`;status.className="small ok";}catch(error){status.textContent=`Save failed: ${error.message}`;status.className="small bad";}});
     document.querySelector("#loadSavedWatchlist").addEventListener("click",()=>{try{const raw=window.localStorage.getItem(WATCHLIST_STORAGE_KEY);if(!raw) throw new Error("no saved watchlist yet");const record=parseSavedWatchlist(raw);symbolsInput.value=record.symbols.join(",");timeframeSelect.value=record.timeframe;status.textContent=`Saved list loaded • ${record.symbols.length} symbols • press Enter or Load live`;status.className="small ok";}catch(error){status.textContent=`Load saved failed: ${error.message}`;status.className="small bad";}});
-    document.querySelector("#useSampleCandidates").addEventListener("click",()=>{liveCards=null;setConsoleMode("SAMPLE");status.textContent="Sample cards active";status.className="small";originalRenderCandidates();});
+    document.querySelector("#useSampleCandidates").addEventListener("click",()=>{loadGeneration+=1;liveCards=null;clearWhyPanel();setConsoleMode("SAMPLE");status.textContent="Sample cards active";status.className="small";originalRenderCandidates();});
     return true;
   }
 
