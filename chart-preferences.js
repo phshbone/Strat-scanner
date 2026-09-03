@@ -44,17 +44,18 @@
     }finally{applying=false;}
   }
 
-  function ensureAnalysisModule(){
+  function ensureAddon({globalName,src}){
     if(typeof window==="undefined"||typeof document==="undefined") return false;
-    if(window.StratChartAnalysisOverlays){window.StratChartAnalysisOverlays.installResearchConsole?.();return true;}
-    if(document.querySelector('script[src="chart-analysis-overlays.js"]')) return false;
-    const script=document.createElement("script");
-    script.src="chart-analysis-overlays.js";
-    script.async=true;
-    script.onload=()=>window.StratChartAnalysisOverlays?.installResearchConsole?.();
-    document.head.appendChild(script);
-    return true;
+    const existing=window[globalName];
+    if(existing){existing.installResearchConsole?.();return true;}
+    if(document.querySelector(`script[src="${src}"]`)) return false;
+    const script=document.createElement("script");script.src=src;script.async=true;
+    script.onload=()=>window[globalName]?.installResearchConsole?.();
+    document.head.appendChild(script);return true;
   }
+
+  function ensureAnalysisModule(){return ensureAddon({globalName:"StratChartAnalysisOverlays",src:"chart-analysis-overlays.js"});}
+  function ensureTradeCoachModule(){return ensureAddon({globalName:"StratChartTradeCoach",src:"chart-trade-coach.js"});}
 
   function ensureControls(){
     if(typeof document==="undefined") return false;
@@ -78,7 +79,7 @@
     return true;
   }
 
-  function refresh(){ensureControls();ensureAnalysisModule();setTimeout(applyToCharts,0);}
+  function refresh(){ensureControls();ensureAnalysisModule();ensureTradeCoachModule();setTimeout(applyToCharts,0);}
 
   function installResearchConsole(){
     if(typeof window==="undefined"||typeof document==="undefined"||window.__stratChartPreferencesInstalled) return false;
@@ -91,5 +92,5 @@
     return true;
   }
 
-  return {STORAGE_KEY,DEFAULTS,SPACING,normalize,load,save,applyToCharts,ensureAnalysisModule,ensureControls,refresh,installResearchConsole};
+  return {STORAGE_KEY,DEFAULTS,SPACING,normalize,load,save,applyToCharts,ensureAddon,ensureAnalysisModule,ensureTradeCoachModule,ensureControls,refresh,installResearchConsole};
 });
