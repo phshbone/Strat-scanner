@@ -73,6 +73,19 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(spacing).toHaveValue('WIDE');
   await expect(grid).not.toBeChecked();
 
+  const volume = page.locator('#chartVolumeVisible');
+  const stratLabels = page.locator('#chartStratLabelsVisible');
+  const setupLevels = page.locator('#chartSetupLevelsVisible');
+  await expect(volume).toBeVisible({ timeout: 15000 });
+  await expect(stratLabels).toBeVisible();
+  await expect(setupLevels).toBeVisible();
+  await expect(volume).toBeChecked();
+  await expect(stratLabels).toBeChecked();
+  await expect(setupLevels).toBeChecked();
+  await stratLabels.uncheck();
+  await expect(stratLabels).not.toBeChecked();
+  await expect(panelCount).toHaveValue('2');
+
   await page.locator('#startChartLiveWatch').click();
   const watchStatus = page.locator('#chartLiveWatchStatus');
   await expect(watchStatus).toContainText('WATCH LIVE');
@@ -83,12 +96,16 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.locator('#chartPanel1')).toBeVisible();
   await expect(page.locator('#chartBarSpacing')).toHaveValue('WIDE');
   await expect(page.locator('#chartGridVisible')).not.toBeChecked();
+  await expect(page.locator('#chartVolumeVisible')).toBeChecked();
+  await expect(page.locator('#chartStratLabelsVisible')).not.toBeChecked();
+  await expect(page.locator('#chartSetupLevelsVisible')).toBeChecked();
 
   await page.waitForTimeout(17000);
   await expect(panelCount).toHaveValue('2');
   await expect(page.locator('#chartPanel1')).toBeVisible();
   await expect(page.locator('#chartBarSpacing')).toHaveValue('WIDE');
   await expect(page.locator('#chartGridVisible')).not.toBeChecked();
+  await expect(page.locator('#chartStratLabelsVisible')).not.toBeChecked();
 
   if (testInfo.project.name.includes('mobile-')) {
     const bodyOverflow = await page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - window.innerWidth));
