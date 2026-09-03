@@ -46,8 +46,10 @@
 
   function volumeData(series){
     return (Array.isArray(series?.bars)?series.bars:[]).map(bar=>{
-      const time=timestampForBar(bar),value=Number(bar?.volume);
-      if(time===null||!Number.isFinite(value)||value<0) return null;
+      const time=timestampForBar(bar);
+      if(time===null||!finite(bar?.volume)) return null;
+      const value=Number(bar.volume);
+      if(value<0) return null;
       const up=Number(bar.close)>=Number(bar.open);
       return {time,value,color:up?"rgba(95,191,134,0.35)":"rgba(216,108,108,0.35)"};
     }).filter(Boolean).sort((a,b)=>a.time-b.time);
