@@ -18,6 +18,7 @@ module.exports = defineConfig({
   },
   projects: [
     { name: 'desktop-chromium', use: { browserName: 'chromium', viewport: { width: 1365, height: 900 } } },
-    { name: 'mobile-chromium', use: { browserName: 'chromium', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } }
+    { name: 'mobile-portrait-chromium', use: { browserName: 'chromium', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
+    { name: 'mobile-landscape-chromium', use: { browserName: 'chromium', viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true } }
   ]
 });
