@@ -44,6 +44,18 @@
     }finally{applying=false;}
   }
 
+  function ensureAnalysisModule(){
+    if(typeof window==="undefined"||typeof document==="undefined") return false;
+    if(window.StratChartAnalysisOverlays){window.StratChartAnalysisOverlays.installResearchConsole?.();return true;}
+    if(document.querySelector('script[src="chart-analysis-overlays.js"]')) return false;
+    const script=document.createElement("script");
+    script.src="chart-analysis-overlays.js";
+    script.async=true;
+    script.onload=()=>window.StratChartAnalysisOverlays?.installResearchConsole?.();
+    document.head.appendChild(script);
+    return true;
+  }
+
   function ensureControls(){
     if(typeof document==="undefined") return false;
     const host=document.getElementById("chartWorkspaceControls");
@@ -66,7 +78,7 @@
     return true;
   }
 
-  function refresh(){ensureControls();setTimeout(applyToCharts,0);}
+  function refresh(){ensureControls();ensureAnalysisModule();setTimeout(applyToCharts,0);}
 
   function installResearchConsole(){
     if(typeof window==="undefined"||typeof document==="undefined"||window.__stratChartPreferencesInstalled) return false;
@@ -79,5 +91,5 @@
     return true;
   }
 
-  return {STORAGE_KEY,DEFAULTS,SPACING,normalize,load,save,applyToCharts,ensureControls,refresh,installResearchConsole};
+  return {STORAGE_KEY,DEFAULTS,SPACING,normalize,load,save,applyToCharts,ensureAnalysisModule,ensureControls,refresh,installResearchConsole};
 });
