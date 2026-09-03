@@ -12,15 +12,28 @@ function attachRuntimeWatch(page) {
   return problems;
 }
 
-test('deployed crypto scan -> chart -> two panels -> watch live preserves layout', async ({ page }) => {
+test('deployed crypto scan -> chart -> two panels -> watch live preserves layout', async ({ page }, testInfo) => {
   const runtimeProblems = attachRuntimeWatch(page);
 
   await page.goto(`?live-smoke=${Date.now()}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: /Trading Research Console/i })).toBeVisible();
 
+  const viewport = page.viewportSize();
+  if (testInfo.project.name.includes('mobile-landscape')) {
+    expect(viewport.width).toBeGreaterThan(viewport.height);
+  }
+  if (testInfo.project.name.includes('mobile-portrait')) {
+    expect(viewport.height).toBeGreaterThan(viewport.width);
+  }
+
   await page.getByRole('button', { name: 'Candidates', exact: true }).click();
   await expect(page.locator('#candidateWorkflowHint')).toContainText(/Scan.*Why.*Chart.*Watch live/i);
   await expect(page.locator('#candidates thead th').last()).toHaveText('Actions');
+
+  if (testInfo.project.name.includes('mobile-')) {
+    const bodyOverflow = await page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - window.innerWidth));
+    expect(bodyOverflow).toBeLessThanOrEqual(2);
+  }
 
   const symbols = page.locator('#liveCandidateSymbols');
   await expect(symbols).toBeVisible();
@@ -51,6 +64,15 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.locator('#chartPanel0')).toBeVisible();
   await expect(page.locator('#chartPanel1')).toBeVisible();
 
+  const spacing = page.locator('#chartBarSpacing');
+  const grid = page.locator('#chartGridVisible');
+  await expect(spacing).toBeVisible();
+  await expect(grid).toBeVisible();
+  await spacing.selectOption('WIDE');
+  await grid.uncheck();
+  await expect(spacing).toHaveValue('WIDE');
+  await expect(grid).not.toBeChecked();
+
   await page.locator('#startChartLiveWatch').click();
   const watchStatus = page.locator('#chartLiveWatchStatus');
   await expect(watchStatus).toContainText('WATCH LIVE');
@@ -59,10 +81,19 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(panelCount).toHaveValue('2');
   await expect(page.locator('#chartPanel0')).toBeVisible();
   await expect(page.locator('#chartPanel1')).toBeVisible();
+  await expect(page.locator('#chartBarSpacing')).toHaveValue('WIDE');
+  await expect(page.locator('#chartGridVisible')).not.toBeChecked();
 
   await page.waitForTimeout(17000);
   await expect(panelCount).toHaveValue('2');
   await expect(page.locator('#chartPanel1')).toBeVisible();
+  await expect(page.locator('#chartBarSpacing')).toHaveValue('WIDE');
+  await expect(page.locator('#chartGridVisible')).not.toBeChecked();
+
+  if (testInfo.project.name.includes('mobile-')) {
+    const bodyOverflow = await page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - window.innerWidth));
+    expect(bodyOverflow).toBeLessThanOrEqual(2);
+  }
 
   await page.locator('#stopChartLiveWatch').click();
   await expect(watchStatus).toContainText(/WATCH STOPPED|snapshot retained/i);
