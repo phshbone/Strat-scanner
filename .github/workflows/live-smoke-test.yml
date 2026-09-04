@@ -2,6 +2,19 @@ name: Live Smoke Test
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Browser target to verify
+        required: true
+        default: deployed
+        type: choice
+        options:
+          - local
+          - deployed
+      live_base_url:
+        description: Optional deployed HTTPS URL override
+        required: false
+        type: string
   push:
     branches: [main]
     paths:
@@ -26,9 +39,13 @@ permissions:
 jobs:
   playwright-live-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
-      LIVE_BASE_URL: https://phshbone.github.io/Strat-scanner/
+      LIVE_SMOKE_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'deployed' }}
+      INPUT_LIVE_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.live_base_url || '' }}
+      DEFAULT_LIVE_BASE_URL: https://phshbone.github.io/Strat-scanner/
+      LOCAL_BASE_URL: http://127.0.0.1:4173/
+      DEPLOY_IDENTITY_FILES: index.html,chart-workspace-ui.js,chart-live-watch.js,chart-preferences.js,chart-analysis-overlays.js,chart-trade-coach.js
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,29 +61,95 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Wait for deployed app shell
+      - name: Resolve test mode and URL
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in {1..24}; do
-            if curl -fsSL "${LIVE_BASE_URL}?deploy-wait=${GITHUB_SHA}-${attempt}" -o deployed-index.html && grep -q "Trading Research Console" deployed-index.html; then
-              exit 0
-            fi
-            sleep 5
+          mode="${LIVE_SMOKE_MODE:-deployed}"
+          case "$mode" in
+            local) base="$LOCAL_BASE_URL" ;;
+            deployed)
+              base="${INPUT_LIVE_BASE_URL:-$DEFAULT_LIVE_BASE_URL}"
+              case "$base" in https://*) ;; *) echo "Deployed Mode requires HTTPS: $base"; exit 2 ;; esac
+              ;;
+            *) echo "Unknown LIVE_SMOKE_MODE: $mode"; exit 2 ;;
+          esac
+          echo "BASE_URL=$base" >> "$GITHUB_ENV"
+          echo "Live Smoke Test mode: $mode"
+          echo "URL under test: $base"
+          echo "Commit SHA: ${GITHUB_SHA:-unknown}"
+
+      - name: Start local smoke server
+        if: env.LIVE_SMOKE_MODE == 'local'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run serve:smoke > /tmp/live-smoke-server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$BASE_URL" > /dev/null; then exit 0; fi
+            sleep 1
           done
-          echo "Deployed app shell did not become reachable"
+          cat /tmp/live-smoke-server.log || true
           exit 1
 
-      - name: Run deployed browser smoke test
+      - name: Wait for exact deployed build
+        if: env.LIVE_SMOKE_MODE == 'deployed'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${BASE_URL%/}"
+          IFS=',' read -ra files <<< "$DEPLOY_IDENTITY_FILES"
+          deadline=$((SECONDS + 300))
+          while true; do
+            all_match=1
+            for raw in "${files[@]}"; do
+              file="$(echo "$raw" | xargs)"
+              tmp="$(mktemp)"
+              rev="${GITHUB_SHA:-manual}-${RANDOM}"
+              if ! curl -fsS -H 'Cache-Control: no-cache, no-store, max-age=0' -H 'Pragma: no-cache' "${base}/${file}?live-smoke-rev=${rev}" -o "$tmp"; then
+                all_match=0
+              elif ! cmp -s "$file" "$tmp"; then
+                all_match=0
+              fi
+              rm -f "$tmp"
+            done
+            if [ "$all_match" -eq 1 ]; then
+              echo "Exact deployed build identity verified for ${GITHUB_SHA:-unknown}."
+              break
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "Timed out waiting for deployed files to match checkout."
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Run browser smoke test
         run: npm run test:live-smoke
 
-      - name: Upload Playwright evidence
+      - name: Upload successful verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-smoke-playwright-report
-          path: |
-            playwright-report/
-            test-results/
+          name: live-smoke-verification-${{ env.LIVE_SMOKE_MODE }}
+          path: verification-artifacts/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 14
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ env.LIVE_SMOKE_MODE }}
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-evidence-${{ env.LIVE_SMOKE_MODE }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
