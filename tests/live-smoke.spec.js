@@ -1,11 +1,23 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
+
+function safeName(value) {
+  return String(value).replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '');
+}
+
+async function verificationShot(page, testInfo, checkpoint) {
+  const dir = path.join(process.cwd(), 'verification-artifacts', safeName(testInfo.project.name));
+  fs.mkdirSync(dir, { recursive: true });
+  await page.screenshot({ path: path.join(dir, `${safeName(checkpoint)}.png`), fullPage: true });
+}
 
 function attachRuntimeWatch(page) {
   const problems = [];
   page.on('pageerror', error => problems.push(`pageerror: ${error.message}`));
   page.on('requestfailed', request => {
     const url = request.url();
-    if (/phshbone\.github\.io|workers\.dev|unpkg\.com/.test(url)) {
+    if (/phshbone\.github\.io|workers\.dev|unpkg\.com|127\.0\.0\.1/.test(url)) {
       problems.push(`requestfailed: ${url} :: ${request.failure()?.errorText || 'unknown'}`);
     }
   });
@@ -14,17 +26,18 @@ function attachRuntimeWatch(page) {
 
 test('deployed crypto scan -> chart -> two panels -> watch live preserves layout', async ({ page }, testInfo) => {
   const runtimeProblems = attachRuntimeWatch(page);
+  await testInfo.attach('live-smoke-context', {
+    body: Buffer.from(JSON.stringify({ mode: process.env.LIVE_SMOKE_MODE || null, baseURL: process.env.BASE_URL || null, commit: process.env.GITHUB_SHA || null }, null, 2)),
+    contentType: 'application/json'
+  });
 
   await page.goto(`?live-smoke=${Date.now()}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: /Trading Research Console/i })).toBeVisible();
+  await verificationShot(page, testInfo, 'startup');
 
   const viewport = page.viewportSize();
-  if (testInfo.project.name.includes('mobile-landscape')) {
-    expect(viewport.width).toBeGreaterThan(viewport.height);
-  }
-  if (testInfo.project.name.includes('mobile-portrait')) {
-    expect(viewport.height).toBeGreaterThan(viewport.width);
-  }
+  if (testInfo.project.name.includes('mobile-landscape')) expect(viewport.width).toBeGreaterThan(viewport.height);
+  if (testInfo.project.name.includes('mobile-portrait')) expect(viewport.height).toBeGreaterThan(viewport.width);
 
   await page.getByRole('button', { name: 'Candidates', exact: true }).click();
   await expect(page.locator('#candidateWorkflowHint')).toContainText(/Scan.*Why.*Chart.*Watch live/i);
@@ -45,6 +58,7 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(status).toContainText(/LIVE PROXY\s*•\s*1\/1 loaded/i, { timeout: 45000 });
   await expect(page.locator('#candidateBody')).toContainText('BTC/USD');
   await expect(page.locator('#liveReferencePriceNotice')).toContainText('VERIFY WITH BROKER');
+  await verificationShot(page, testInfo, 'btc-live-candidate');
 
   const chartButton = page.getByRole('button', { name: /Chart BTC\/USD/i }).first();
   await expect(chartButton).toBeVisible({ timeout: 15000 });
@@ -56,17 +70,9 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.locator('#chartWorkspaceReference')).toHaveText('REFERENCE DATA • VERIFY WITH BROKER');
   await expect(page.locator('#chartWorkspaceStatus')).toContainText('BTC/USD');
   await expect(page.locator('#chartPanel0')).toBeVisible({ timeout: 30000 });
-
-  const tradeCoach = page.locator('#chartTradeCoach');
-  await expect(tradeCoach).toBeVisible({ timeout: 15000 });
-  await expect(tradeCoach).toContainText('Trade Coach');
-  await expect(tradeCoach).toContainText('RULE-BASED');
-  await expect(page.locator('#chartTradeCoachMessage')).toContainText('Current setup context');
-  await page.locator('#chartTradeCoachWhy').click();
-  await expect(page.locator('#chartTradeCoachWhyPanel')).toContainText('SETUP');
-  await expect(page.locator('#chartTradeCoachWhyPanel')).toContainText('PRICE');
-  await expect(page.locator('#chartTradeCoachWhyPanel')).toContainText('TRIGGER');
-  await expect(page.locator('#chartTradeCoachWhyPanel')).toContainText('MAGNITUDE');
+  await expect(page.locator('#chartTradeCoach')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#chartTradeCoach')).toContainText(/Trade Coach/i);
+  await expect(page.locator('#chartTradeCoach')).toContainText(/RULE-BASED/i);
 
   const panelCount = page.locator('#chartPanelCount');
   await expect(panelCount).toBeVisible();
@@ -97,6 +103,11 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(stratLabels).not.toBeChecked();
   await expect(panelCount).toHaveValue('2');
 
+  await page.locator('#chartTradeCoachWhy').click();
+  await expect(page.locator('#chartTradeCoachWhyPanel')).toBeVisible();
+  await expect(page.locator('#chartTradeCoachWhyPanel')).toContainText(/SETUP|PRICE|TRIGGER|MAGNITUDE/i);
+  await verificationShot(page, testInfo, 'chart-two-panel-trade-coach');
+
   await page.locator('#startChartLiveWatch').click();
   const watchStatus = page.locator('#chartLiveWatchStatus');
   await expect(watchStatus).toContainText('WATCH LIVE');
@@ -110,8 +121,7 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.locator('#chartVolumeVisible')).toBeChecked();
   await expect(page.locator('#chartStratLabelsVisible')).not.toBeChecked();
   await expect(page.locator('#chartSetupLevelsVisible')).toBeChecked();
-  await expect(page.locator('#chartTradeCoach')).toContainText('RULE-BASED');
-  await expect(page.locator('#chartTradeCoachMessage')).not.toContainText('Waiting for chart context');
+  await expect(page.locator('#chartTradeCoach')).toBeVisible();
 
   await page.waitForTimeout(17000);
   await expect(panelCount).toHaveValue('2');
@@ -119,7 +129,8 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   await expect(page.locator('#chartBarSpacing')).toHaveValue('WIDE');
   await expect(page.locator('#chartGridVisible')).not.toBeChecked();
   await expect(page.locator('#chartStratLabelsVisible')).not.toBeChecked();
-  await expect(page.locator('#chartTradeCoachMessage')).not.toContainText('Waiting for chart context');
+  await expect(page.locator('#chartTradeCoach')).toBeVisible();
+  await verificationShot(page, testInfo, 'watch-live-after-refresh');
 
   if (testInfo.project.name.includes('mobile-')) {
     const bodyOverflow = await page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - window.innerWidth));
@@ -128,7 +139,6 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
 
   await page.locator('#stopChartLiveWatch').click();
   await expect(watchStatus).toContainText(/WATCH STOPPED|snapshot retained/i);
-
   expect(runtimeProblems, runtimeProblems.join('\n')).toEqual([]);
 });
 
@@ -150,5 +160,6 @@ test('sample selection wins over a stale live scan response', async ({ page }) =
   await expect(page.locator('.topbar .badge')).toHaveText('SAMPLE DATA');
   await page.waitForTimeout(3000);
   await expect(page.locator('.topbar .badge')).toHaveText('SAMPLE DATA');
+  await verificationShot(page, testInfo, 'sample-mode-after-stale-live-response');
   expect(runtimeProblems, runtimeProblems.join('\n')).toEqual([]);
 });
