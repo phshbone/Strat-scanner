@@ -1,5 +1,8 @@
 const { defineConfig } = require('@playwright/test');
 
+const baseURL = process.env.BASE_URL;
+if (!baseURL) throw new Error('BASE_URL is required. Resolve Local or Deployed Mode before Playwright starts.');
+
 module.exports = defineConfig({
   testDir: './tests',
   timeout: 90000,
@@ -11,7 +14,7 @@ module.exports = defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }]
   ],
   use: {
-    baseURL: process.env.LIVE_BASE_URL || 'https://phshbone.github.io/Strat-scanner/',
+    baseURL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure'
