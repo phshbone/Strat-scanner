@@ -142,7 +142,7 @@ test('deployed crypto scan -> chart -> two panels -> watch live preserves layout
   expect(runtimeProblems, runtimeProblems.join('\n')).toEqual([]);
 });
 
-test('sample selection wins over a stale live scan response', async ({ page }) => {
+test('sample selection wins over a stale live scan response', async ({ page }, testInfo) => {
   const runtimeProblems = attachRuntimeWatch(page);
   await page.route('**/time-series?*', async route => {
     await new Promise(resolve => setTimeout(resolve, 1500));
