@@ -70,3 +70,11 @@ Build a deterministic dataset job:
 Twelve Data -> normalized semantic bars -> Strat engine -> historical-event-builder -> D1
 
 The first controlled population should be SPY, then QQQ/IWM, one validated timeframe at a time. No percentage is promoted into Trade Coach until exact-cohort sample-size and audit gates pass.
+
+## Evidence eligibility gate
+
+The first completed-parent-bar extractor is useful for pipeline validation, but it is **not automatically eligible for historical decision evidence**. A completed 15-minute bar tells us what the bar finally became; it does not prove every setup state a live trader could have seen intrabar. Using only surviving final bar states can create look-ahead/survivorship bias.
+
+Every stored event therefore carries `evidence_eligible`, `sample_construction`, and `lookahead_risk`. The historical evidence query hard-filters to `evidence_eligible=1`. Current completed-bar probe events are stored/inspected as research artifacts but must not drive Trade Coach percentages.
+
+The next research step is intrabar activation reconstruction using validated lower-timeframe bars. For 15-minute research, 5-minute bars will rebuild the evolving 15-minute candle, identify the first observable deterministic setup activation, and resolve outcome order where the 5-minute sequence proves it. Only cohorts that pass that construction audit can be promoted to evidence-eligible records.
