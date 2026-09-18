@@ -9,10 +9,25 @@ function normalizeTimeframe(v){return String(v||"").trim().toUpperCase();}
 
 function compactHistoricalEvidence(value){
   if(!value||typeof value!=="object"||!(Number(value.sampleSize)>0)) return null;
+  const baseline=value.broaderBaseline&&typeof value.broaderBaseline==="object"?{
+    status:value.broaderBaseline.status||null,
+    sampleSize:Number(value.broaderBaseline.sampleSize)||0,
+    resolvedSampleSize:Number(value.broaderBaseline.resolvedSampleSize)||0,
+    successRate:finite(value.broaderBaseline.successRate)?Number(value.broaderBaseline.successRate):null,
+    comparisonTier:value.broaderBaseline.comparisonTier||"SETUP_BASELINE"
+  }:null;
   return {
+    status:value.status||null,
+    sufficient:value.sufficient===true,
     sampleSize:Number(value.sampleSize),
+    resolvedSampleSize:Number(value.resolvedSampleSize)||0,
     successRate:finite(value.successRate)?Number(value.successRate):null,
+    successRatePct:finite(value.successRatePct)?Number(value.successRatePct):null,
     successDefinition:value.successDefinition||null,
+    minResolvedSampleSize:Number(value.minResolvedSampleSize)||null,
+    comparisonTier:value.comparisonTier||null,
+    conditions:value.conditions||null,
+    broaderBaseline:baseline,
     window:value.window||null,
     source:value.source||null
   };
