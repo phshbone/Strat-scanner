@@ -3,6 +3,8 @@
 const SCHEMA_VERSION=1;
 const DEFAULT_MIN_RESOLVED=20;
 const MAX_WRITE_BATCH=500;
+const EVIDENCE_SAMPLE_CONSTRUCTION="LOWER_5M_CHECKPOINT_FIRST_OBSERVABLE";
+const EVIDENCE_SUCCESS_DEFINITION="MAGNITUDE_BEFORE_STOP_AFTER_OBSERVATION_CHECKPOINT";
 
 const CONTEXT_FILTERS=Object.freeze({
   ftfc_alignment:"ftfc_alignment",
@@ -13,6 +15,7 @@ const CONTEXT_FILTERS=Object.freeze({
   exhaustion_state:"exhaustion_state",
   sss50_state:"sss50_state",
   price_bucket:"price_bucket",
+  observation_phase:"observation_phase",
   stop_model:"stop_model"
 });
 
@@ -22,7 +25,8 @@ const PROFILE_FILTERS=Object.freeze({
   extended_hours_included:"extended_hours_included",
   bar_anchor:"bar_anchor",
   bar_anchor_offset_minutes:"bar_anchor_offset_minutes",
-  provider_aggregation:"provider_aggregation"
+  provider_aggregation:"provider_aggregation",
+  sample_construction:"sample_construction"
 });
 
 function present(v){return v!==null&&v!==undefined&&v!=="";}
@@ -50,6 +54,10 @@ function normalizeEvent(input={}){
     market_type:upper(input.marketType),
     stop_model:stopModel,
     entry,stop,magnitude,
+    activation_price:num(input.activationPrice),
+    observation_lag_minutes:Number.isInteger(Number(input.observationLagMinutes))?Number(input.observationLagMinutes):null,
+    activation_progress_pct:num(input.activationProgressPct),
+    observation_phase:upper(input.observationPhase),
     resolution:upper(input.resolution)||"UNRESOLVED",
     magnitude_hit:input.magnitudeHit===true?1:0,
     stop_hit:input.stopHit===true?1:0,
@@ -75,6 +83,7 @@ function normalizeEvent(input={}){
     semantic_key:input.semanticKey||null,
     evidence_eligible:input.evidenceEligible===true?1:0,
     sample_construction:upper(input.sampleConstruction)||"COMPLETED_PARENT_BAR_SETUP_STATE",
+    success_definition:upper(input.successDefinition)||null,
     lookahead_risk:upper(input.lookaheadRisk),
     schema_version:SCHEMA_VERSION,
     import_id:input.importId||null,
@@ -82,43 +91,18 @@ function normalizeEvent(input={}){
   };
 }
 
-const INSERT_SQL=[
-  "INSERT INTO historical_events (",
-  "event_id,symbol,signal_timestamp,setup_id,direction,timeframe,market_type,stop_model,",
-  "entry,stop,magnitude,resolution,magnitude_hit,stop_hit,first_hit,sequence_ambiguous,",
-  "time_to_magnitude_bars,realized_r,ftfc_alignment,market_alignment,sector_alignment,",
-  "elder_state,minervini_state,exhaustion_state,sss50_state,price_bucket,market_timezone,",
-  "session,extended_hours_included,bar_anchor,bar_anchor_offset_minutes,provider,",
-  "provider_aggregation,semantic_key,evidence_eligible,sample_construction,lookahead_risk,schema_version,import_id,event_json,updated_at",
-  ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",
-  "ON CONFLICT(event_id) DO UPDATE SET ",
-  "symbol=excluded.symbol,signal_timestamp=excluded.signal_timestamp,setup_id=excluded.setup_id,",
-  "direction=excluded.direction,timeframe=excluded.timeframe,market_type=excluded.market_type,",
-  "stop_model=excluded.stop_model,entry=excluded.entry,stop=excluded.stop,magnitude=excluded.magnitude,",
-  "resolution=excluded.resolution,magnitude_hit=excluded.magnitude_hit,stop_hit=excluded.stop_hit,",
-  "first_hit=excluded.first_hit,sequence_ambiguous=excluded.sequence_ambiguous,",
-  "time_to_magnitude_bars=excluded.time_to_magnitude_bars,realized_r=excluded.realized_r,",
-  "ftfc_alignment=excluded.ftfc_alignment,market_alignment=excluded.market_alignment,",
-  "sector_alignment=excluded.sector_alignment,elder_state=excluded.elder_state,",
-  "minervini_state=excluded.minervini_state,exhaustion_state=excluded.exhaustion_state,",
-  "sss50_state=excluded.sss50_state,price_bucket=excluded.price_bucket,",
-  "market_timezone=excluded.market_timezone,session=excluded.session,",
-  "extended_hours_included=excluded.extended_hours_included,bar_anchor=excluded.bar_anchor,",
-  "bar_anchor_offset_minutes=excluded.bar_anchor_offset_minutes,provider=excluded.provider,",
-  "provider_aggregation=excluded.provider_aggregation,semantic_key=excluded.semantic_key,",
-  "evidence_eligible=excluded.evidence_eligible,sample_construction=excluded.sample_construction,lookahead_risk=excluded.lookahead_risk,",
-  "schema_version=excluded.schema_version,import_id=excluded.import_id,event_json=excluded.event_json,",
-  "updated_at=CURRENT_TIMESTAMP"
-].join("");
-
 const ROW_FIELDS=[
  "event_id","symbol","signal_timestamp","setup_id","direction","timeframe","market_type","stop_model",
- "entry","stop","magnitude","resolution","magnitude_hit","stop_hit","first_hit","sequence_ambiguous",
- "time_to_magnitude_bars","realized_r","ftfc_alignment","market_alignment","sector_alignment",
- "elder_state","minervini_state","exhaustion_state","sss50_state","price_bucket","market_timezone",
- "session","extended_hours_included","bar_anchor","bar_anchor_offset_minutes","provider",
- "provider_aggregation","semantic_key","evidence_eligible","sample_construction","lookahead_risk","schema_version","import_id","event_json"
+ "entry","stop","magnitude","activation_price","observation_lag_minutes","activation_progress_pct","observation_phase",
+ "resolution","magnitude_hit","stop_hit","first_hit","sequence_ambiguous","time_to_magnitude_bars","realized_r",
+ "ftfc_alignment","market_alignment","sector_alignment","elder_state","minervini_state","exhaustion_state","sss50_state","price_bucket",
+ "market_timezone","session","extended_hours_included","bar_anchor","bar_anchor_offset_minutes","provider","provider_aggregation","semantic_key",
+ "evidence_eligible","sample_construction","success_definition","lookahead_risk","schema_version","import_id","event_json"
 ];
+
+const UPDATE_FIELDS=ROW_FIELDS.filter(field=>field!=="event_id"&&field!=="event_json");
+const INSERT_SQL="INSERT INTO historical_events ("+ROW_FIELDS.concat(["updated_at"]).join(",")+") VALUES ("+ROW_FIELDS.map(()=>"?").join(",")+",CURRENT_TIMESTAMP) "+
+  "ON CONFLICT(event_id) DO UPDATE SET "+UPDATE_FIELDS.map(field=>field+"=excluded."+field).concat(["event_json=excluded.event_json","updated_at=CURRENT_TIMESTAMP"]).join(",");
 
 async function upsertHistoricalEvents(db,events,{importId=null}={}){
   if(!db||typeof db.prepare!=="function") throw new Error("historical database binding unavailable");
@@ -140,8 +124,11 @@ function normalizeEvidenceQuery(source){
   if(!setupId||!["BULLISH","BEARISH"].includes(direction)||!timeframe) throw new Error("setup, direction, and timeframe are required");
   const minRaw=Number(get("min_resolved")||DEFAULT_MIN_RESOLVED);
   const minResolved=Number.isInteger(minRaw)&&minRaw>0&&minRaw<=10000?minRaw:DEFAULT_MIN_RESOLVED;
-  const out={setup_id:setupId,direction,timeframe,market_type:upper(get("market_type")),min_resolved:minResolved};
+  const requestedConstruction=upper(get("sample_construction")||EVIDENCE_SAMPLE_CONSTRUCTION);
+  if(requestedConstruction!==EVIDENCE_SAMPLE_CONSTRUCTION) throw new Error("unsupported historical sample construction");
+  const out={setup_id:setupId,direction,timeframe,market_type:upper(get("market_type")),min_resolved:minResolved,sample_construction:requestedConstruction};
   for(const key of Object.keys(PROFILE_FILTERS)){
+    if(key==="sample_construction") continue;
     const v=get(key);
     if(!present(v)) continue;
     out[key]=key==="extended_hours_included"?boolInt(v):key==="bar_anchor_offset_minutes"?Number(v):String(v);
@@ -151,11 +138,11 @@ function normalizeEvidenceQuery(source){
 }
 
 function whereFor(query,{includeContext}={}){
-  const clauses=["evidence_eligible=1","setup_id=?","direction=?","timeframe=?"];
-  const params=[query.setup_id,query.direction,query.timeframe];
+  const clauses=["evidence_eligible=1","sample_construction=?","setup_id=?","direction=?","timeframe=?"];
+  const params=[query.sample_construction||EVIDENCE_SAMPLE_CONSTRUCTION,query.setup_id,query.direction,query.timeframe];
   if(query.market_type){clauses.push("market_type=?");params.push(query.market_type);}
   for(const [key,column] of Object.entries(PROFILE_FILTERS)){
-    if(!present(query[key])) continue;
+    if(key==="sample_construction"||!present(query[key])) continue;
     clauses.push(column+"=?");params.push(query[key]);
   }
   if(includeContext){
@@ -189,7 +176,7 @@ function summary(row={},minResolved){
     successRatePct:resolved?Number(((wins/resolved)*100).toFixed(1)):null,
     ambiguous:Number(row.ambiguous)||0,open:Number(row.open_count)||0,unresolved:Number(row.unresolved)||0,
     averageRealizedR:num(row.average_realized_r),firstEventAt:row.first_event_at||null,lastEventAt:row.last_event_at||null,
-    minResolvedSampleSize:minResolved,successDefinition:"MAGNITUDE_BEFORE_STOP"
+    minResolvedSampleSize:minResolved,successDefinition:EVIDENCE_SUCCESS_DEFINITION,sampleConstruction:EVIDENCE_SAMPLE_CONSTRUCTION
   };
 }
 
@@ -207,18 +194,18 @@ async function queryHistoricalEvidence(db,source){
     ...exact,comparisonTier:"EXACT_CONTEXT",conditions:query,
     broaderBaseline:{...baseline,comparisonTier:"SETUP_BASELINE"},
     source:"CLOUDFLARE_D1_HISTORICAL_EVENTS",historicalEvidenceIsNotForecast:true,
-    note:exact.status==="AVAILABLE"?"Descriptive historical evidence for the exact defined cohort. It is not a forecast.":exact.status==="INSUFFICIENT_SAMPLE"?"Comparable events exist, but the resolved sample is below the minimum. Keep guidance rule-based.":"No comparable historical events are available for the exact defined cohort."
+    note:exact.status==="AVAILABLE"?"Descriptive historical evidence for first-observable 5m checkpoint states. It is not a forecast.":exact.status==="INSUFFICIENT_SAMPLE"?"Comparable events exist, but the resolved sample is below the minimum. Keep guidance rule-based.":"No comparable evidence-eligible historical events are available for the exact defined cohort."
   };
 }
 
 async function historicalDbHealth(db){
-  if(!db||typeof db.prepare!=="function") return {configured:false,migrated:false,eventCount:0};
+  if(!db||typeof db.prepare!=="function") return {configured:false,migrated:false,eventCount:0,eligibleEventCount:0};
   try{
-    const row=await db.prepare("SELECT COUNT(*) AS event_count, MIN(signal_timestamp) AS first_event_at, MAX(signal_timestamp) AS last_event_at FROM historical_events").first();
-    return {configured:true,migrated:true,eventCount:Number(row?.event_count)||0,firstEventAt:row?.first_event_at||null,lastEventAt:row?.last_event_at||null,schemaVersion:SCHEMA_VERSION};
+    const row=await db.prepare("SELECT COUNT(*) AS event_count, SUM(CASE WHEN evidence_eligible=1 THEN 1 ELSE 0 END) AS eligible_event_count, MIN(signal_timestamp) AS first_event_at, MAX(signal_timestamp) AS last_event_at FROM historical_events").first();
+    return {configured:true,migrated:true,eventCount:Number(row?.event_count)||0,eligibleEventCount:Number(row?.eligible_event_count)||0,firstEventAt:row?.first_event_at||null,lastEventAt:row?.last_event_at||null,schemaVersion:SCHEMA_VERSION,evidenceSampleConstruction:EVIDENCE_SAMPLE_CONSTRUCTION};
   }catch(error){
-    return {configured:true,migrated:false,eventCount:0,error:error?.message||String(error),schemaVersion:SCHEMA_VERSION};
+    return {configured:true,migrated:false,eventCount:0,eligibleEventCount:0,error:error?.message||String(error),schemaVersion:SCHEMA_VERSION,evidenceSampleConstruction:EVIDENCE_SAMPLE_CONSTRUCTION};
   }
 }
 
-export {SCHEMA_VERSION,DEFAULT_MIN_RESOLVED,MAX_WRITE_BATCH,CONTEXT_FILTERS,PROFILE_FILTERS,normalizeEvent,normalizeEvidenceQuery,whereFor,summary,upsertHistoricalEvents,queryHistoricalEvidence,historicalDbHealth};
+export {SCHEMA_VERSION,DEFAULT_MIN_RESOLVED,MAX_WRITE_BATCH,EVIDENCE_SAMPLE_CONSTRUCTION,EVIDENCE_SUCCESS_DEFINITION,CONTEXT_FILTERS,PROFILE_FILTERS,ROW_FIELDS,INSERT_SQL,normalizeEvent,normalizeEvidenceQuery,whereFor,summary,upsertHistoricalEvents,queryHistoricalEvidence,historicalDbHealth};
