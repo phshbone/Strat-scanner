@@ -9,12 +9,24 @@ function normalizeTimeframe(v){return String(v||"").trim().toUpperCase();}
 
 function compactHistoricalEvidence(value){
   if(!value||typeof value!=="object"||!(Number(value.sampleSize)>0)) return null;
+  const compactTemporal=temporal=>temporal&&typeof temporal==="object"?{
+    coverageStatus:temporal.coverageStatus||null,
+    populatedPeriods:Number(temporal.populatedPeriods)||0,
+    minPopulatedPeriods:Number(temporal.minPopulatedPeriods)||null,
+    minResolvedPerPeriod:Number(temporal.minResolvedPerPeriod)||null,
+    earliestPeriod:temporal.earliestPeriod||null,
+    latestPeriod:temporal.latestPeriod||null,
+    populatedRateMinPct:finite(temporal.populatedRateMinPct)?Number(temporal.populatedRateMinPct):null,
+    populatedRateMaxPct:finite(temporal.populatedRateMaxPct)?Number(temporal.populatedRateMaxPct):null,
+    populatedRateSpreadPct:finite(temporal.populatedRateSpreadPct)?Number(temporal.populatedRateSpreadPct):null
+  }:null;
   const baseline=value.broaderBaseline&&typeof value.broaderBaseline==="object"?{
     status:value.broaderBaseline.status||null,
     sampleSize:Number(value.broaderBaseline.sampleSize)||0,
     resolvedSampleSize:Number(value.broaderBaseline.resolvedSampleSize)||0,
     successRate:finite(value.broaderBaseline.successRate)?Number(value.broaderBaseline.successRate):null,
-    comparisonTier:value.broaderBaseline.comparisonTier||"SETUP_BASELINE"
+    comparisonTier:value.broaderBaseline.comparisonTier||"SETUP_BASELINE",
+    temporalCoverage:compactTemporal(value.broaderBaseline.temporalCoverage)
   }:null;
   return {
     status:value.status||null,
@@ -27,6 +39,7 @@ function compactHistoricalEvidence(value){
     minResolvedSampleSize:Number(value.minResolvedSampleSize)||null,
     comparisonTier:value.comparisonTier||null,
     conditions:value.conditions||null,
+    temporalCoverage:compactTemporal(value.temporalCoverage),
     broaderBaseline:baseline,
     window:value.window||null,
     source:value.source||null
