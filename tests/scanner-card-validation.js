@@ -18,7 +18,7 @@ const card=buildScannerCard({
   entry:101,
   stop:99,
   target:106,
-  historicalEvidence:{sampleSize:120,successRate:68.3,successDefinition:"T1 before invalidation",window:"90d",source:"RESEARCH"},
+  historicalEvidence:{sampleSize:120,resolvedSampleSize:110,successRate:0.683,successRatePct:68.3,successDefinition:"MAGNITUDE_BEFORE_STOP_AFTER_OBSERVATION_CHECKPOINT",window:"90d",source:"RESEARCH",temporalCoverage:{coverageStatus:"TEMPORAL_COVERAGE",populatedPeriods:4,minPopulatedPeriods:3,minResolvedPerPeriod:10,earliestPeriod:"2026-04",latestPeriod:"2026-08",populatedRateMinPct:55,populatedRateMaxPct:72,populatedRateSpreadPct:17},broaderBaseline:{status:"AVAILABLE",sampleSize:240,resolvedSampleSize:220,successRate:0.61,comparisonTier:"SETUP_BASELINE",temporalCoverage:{coverageStatus:"TEMPORAL_COVERAGE",populatedPeriods:5,minPopulatedPeriods:3,minResolvedPerPeriod:10,earliestPeriod:"2026-03",latestPeriod:"2026-08",populatedRateMinPct:50,populatedRateMaxPct:68,populatedRateSpreadPct:18}}},
   observedAt:"2026-08-20T21:00:00Z"
 });
 
@@ -34,6 +34,7 @@ t("ftfc aligned",()=>assert.equal(card.ftfc.status,"ALIGNED"));
 t("index breadth aligned",()=>assert.equal(card.breadth.index.status,"ALIGNED"));
 t("sector breadth aligned",()=>assert.equal(card.breadth.sector.status,"ALIGNED"));
 t("historical sample retained",()=>assert.equal(card.historicalEvidence.sampleSize,120));
+t("historical temporal coverage retained",()=>{assert.equal(card.historicalEvidence.temporalCoverage.coverageStatus,"TEMPORAL_COVERAGE");assert.equal(card.historicalEvidence.temporalCoverage.populatedPeriods,4);assert.equal(card.historicalEvidence.broaderBaseline.temporalCoverage.populatedPeriods,5);});
 t("historical evidence remains descriptive",()=>assert.equal(card.probabilityScore,null));
 t("no broker authority",()=>assert.equal(card.brokerAuthority,false));
 t("why list is present",()=>assert.ok(Array.isArray(card.why)&&card.why.length>0));
