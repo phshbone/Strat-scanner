@@ -49,7 +49,7 @@
   t("eligible checkpoint metadata is normalized",()=>{assert.equal(n.evidence_eligible,1);assert.equal(n.sample_construction,dbmod.EVIDENCE_SAMPLE_CONSTRUCTION);assert.equal(n.observation_phase,"FIRST_5M");assert.equal(n.activation_price,101);});
 
   const q=dbmod.normalizeEvidenceQuery(new URLSearchParams("setup=2-2&direction=bullish&timeframe=15&market_type=us_equity&ftfc_alignment=full_bullish&price_bucket=early&observation_phase=first_5m&stop_model=midpoint&min_resolved=30"));
-  t("normalizes evidence query",()=>{assert.equal(q.direction,"BULLISH");assert.equal(q.min_resolved,30);assert.equal(q.ftfc_alignment,"FULL_BULLISH");assert.equal(q.sample_construction,dbmod.EVIDENCE_SAMPLE_CONSTRUCTION);});
+  t("normalizes evidence query",()=>{assert.equal(q.direction,"BULLISH");assert.equal(q.min_resolved,30);assert.equal(q.ftfc_alignment,"FULL_BULLISH");assert.equal(q.sample_construction,dbmod.EVIDENCE_SAMPLE_CONSTRUCTION);assert.equal(q.min_resolved_period,10);assert.equal(q.min_populated_periods,3);});
 
   const exact=dbmod.whereFor(q,{includeContext:true});
   const baseline=dbmod.whereFor(q,{includeContext:false});
@@ -75,6 +75,18 @@
             async first(){
               const exact=sql.includes("ftfc_alignment=?");
               return exact?{sample_size:12,resolved_sample_size:10,wins:6,losses:4,ambiguous:2}:{sample_size:40,resolved_sample_size:35,wins:21,losses:14,ambiguous:3};
+            },
+            async all(){
+              const exact=sql.includes("ftfc_alignment=?");
+              return {results:exact?[
+                {period:"2026-04",sample_size:12,resolved_sample_size:10,wins:6,losses:4,ambiguous:2,unresolved:0},
+                {period:"2026-05",sample_size:11,resolved_sample_size:10,wins:5,losses:5,ambiguous:1,unresolved:0},
+                {period:"2026-06",sample_size:10,resolved_sample_size:10,wins:7,losses:3,ambiguous:0,unresolved:0}
+              ]:[
+                {period:"2026-04",sample_size:15,resolved_sample_size:12,wins:7,losses:5,ambiguous:2,unresolved:1},
+                {period:"2026-05",sample_size:15,resolved_sample_size:12,wins:8,losses:4,ambiguous:2,unresolved:1},
+                {period:"2026-06",sample_size:15,resolved_sample_size:11,wins:6,losses:5,ambiguous:2,unresolved:2}
+              ]};
             }
           };
         },
@@ -84,8 +96,8 @@
   };
 
   const evidence=await dbmod.queryHistoricalEvidence(fakeDb,q);
-  t("query keeps exact and baseline separate",()=>{assert.equal(evidence.sampleSize,12);assert.equal(evidence.broaderBaseline.sampleSize,40);assert.equal(evidence.status,"INSUFFICIENT_SAMPLE");assert.equal(evidence.sampleConstruction,dbmod.EVIDENCE_SAMPLE_CONSTRUCTION);});
-  const health=await dbmod.historicalDbHealth(fakeDb);
+  t("query keeps exact and baseline separate",()=>{assert.equal(evidence.sampleSize,12);assert.equal(evidence.broaderBaseline.sampleSize,40);assert.equal(evidence.status,"INSUFFICIENT_SAMPLE");assert.equal(evidence.sampleConstruction,dbmod.EVIDENCE_SAMPLE_CONSTRUCTION);});\n  t("query carries temporal coverage without confidence scoring",()=>{assert.equal(evidence.temporalCoverage.coverageStatus,"TEMPORAL_COVERAGE");assert.equal(evidence.temporalCoverage.populatedPeriods,3);assert.equal(evidence.temporalCoverage.populatedRateMinPct,50);assert.equal(evidence.temporalCoverage.populatedRateMaxPct,70);assert.ok(!("confidence" in evidence.temporalCoverage));});
+  const temporal=dbmod.temporalSummary([{period:"2026-04",sample_size:12,resolved_sample_size:10,wins:6,losses:4},{period:"2026-05",sample_size:9,resolved_sample_size:9,wins:5,losses:4}],{minResolvedPerPeriod:10,minPopulatedPeriods:2});\n  t("temporal summary keeps weak monthly coverage explicit",()=>{assert.equal(temporal.coverageStatus,"LIMITED_PERIOD_COVERAGE");assert.equal(temporal.populatedPeriods,1);});\n\n  const health=await dbmod.historicalDbHealth(fakeDb);
   t("health reports eligible database population",()=>{assert.equal(health.configured,true);assert.equal(health.migrated,true);assert.equal(health.eventCount,123);assert.equal(health.eligibleEventCount,80);});
 
   console.log("\n"+pass+"/"+pass+" PASS historical database validation");
