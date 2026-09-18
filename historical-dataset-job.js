@@ -79,7 +79,11 @@ async function fetchHistoricalSeries({proxyBase=live.DEFAULT_PROXY_BASE,symbol,t
   if(typeof fetchImpl!=="function") throw new Error("fetch implementation required");
   const url=buildHistoricalProxyUrl({symbol,timeframe,outputsize,startDate,endDate});
   const response=await fetchImpl(url,{headers:{Accept:"application/json"}});
-  if(!response||response.ok===false) throw new Error("historical market-data request failed: HTTP "+(response?.status||"error"));
+  if(!response||response.ok===false){
+    const error=new Error("historical market-data request failed: HTTP "+(response?.status||"error"));
+    error.status=Number(response?.status)||null;
+    throw error;
+  }
   return live.normalizePayload(await response.json(),{symbol,timeframe});
 }
 
@@ -123,16 +127,48 @@ function mergeHistoricalSeries(seriesList){
   return {...first,bars};
 }
 
-async function fetchHistoricalSeriesRange({proxyBase=live.DEFAULT_PROXY_BASE,symbol,timeframe,startDate,endDate,chunkDays=30,outputsize=5000,delayMs=8000,fetchImpl=globalThis.fetch}={}){
+function retryableHistoricalError(error){
+  const status=Number(error?.status);
+  return status===429 || (status>=500&&status<=599);
+}
+
+async function fetchHistoricalSeriesRange({
+  proxyBase=live.DEFAULT_PROXY_BASE,
+  symbol,
+  timeframe,
+  startDate,
+  endDate,
+  chunkDays=30,
+  outputsize=5000,
+  delayMs=8000,
+  maxAttempts=4,
+  retryBaseMs=15000,
+  fetchImpl=globalThis.fetch
+}={}){
   const chunks=dateChunks(startDate,endDate,{chunkDays});
+  const attempts=Math.max(1,Math.min(6,Number(maxAttempts)||4));
+  const retryBase=Math.max(0,Number(retryBaseMs)||0);
   const series=[];
+  let retryCount=0;
   for(let i=0;i<chunks.length;i++){
     const chunk=chunks[i];
-    series.push(await fetchHistoricalSeries({proxyBase,symbol,timeframe,outputsize,startDate:chunk.startDate,endDate:chunk.endDate,fetchImpl}));
+    let fetched=null;
+    for(let attempt=1;attempt<=attempts;attempt++){
+      try{
+        fetched=await fetchHistoricalSeries({proxyBase,symbol,timeframe,outputsize,startDate:chunk.startDate,endDate:chunk.endDate,fetchImpl});
+        break;
+      }catch(error){
+        if(attempt>=attempts||!retryableHistoricalError(error)) throw error;
+        retryCount+=1;
+        const waitMs=retryBase*Math.pow(2,attempt-1);
+        if(waitMs>0) await new Promise(resolve=>setTimeout(resolve,waitMs));
+      }
+    }
+    series.push(fetched);
     if(delayMs>0&&i<chunks.length-1) await new Promise(resolve=>setTimeout(resolve,delayMs));
   }
   const merged=mergeHistoricalSeries(series);
-  return {...merged,range:{startDate:isoDate(startDate),endDate:isoDate(endDate),chunkDays,chunksRequested:chunks.length}};
+  return {...merged,range:{startDate:isoDate(startDate),endDate:isoDate(endDate),chunkDays,chunksRequested:chunks.length,retryCount}};
 }
 
 async function writeHistoricalDataset({proxyBase=live.DEFAULT_PROXY_BASE,dataset,token,importId,fetchImpl=globalThis.fetch,batchSize=400}={}){
@@ -155,4 +191,4 @@ async function writeHistoricalDataset({proxyBase=live.DEFAULT_PROXY_BASE,dataset
   return {written,batches:Math.ceil(dataset.events.length/size)};
 }
 
-module.exports={normalizeStopModel,buildHistoricalDataset,buildEvidenceDataset,summarizeDataset,buildHistoricalProxyUrl,fetchHistoricalSeries,isoDate,dateChunks,mergeHistoricalSeries,fetchHistoricalSeriesRange,writeHistoricalDataset};
+module.exports={normalizeStopModel,buildHistoricalDataset,buildEvidenceDataset,summarizeDataset,buildHistoricalProxyUrl,fetchHistoricalSeries,isoDate,dateChunks,mergeHistoricalSeries,retryableHistoricalError,fetchHistoricalSeriesRange,writeHistoricalDataset};
