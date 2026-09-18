@@ -3,6 +3,7 @@
 const fs=require("fs");
 const path=require("path");
 const job=require("../historical-dataset-job.js");
+const cohortAudit=require("../historical-cohort-audit.js");
 
 function localDate(bar){return String(bar?.semantics?.periodOpenId||"").split("|")[2]||null;}
 function countBy(events,keyFn){
@@ -10,6 +11,15 @@ function countBy(events,keyFn){
   for(const event of events||[]){const key=keyFn(event);out[key]=(out[key]||0)+1;}
   return out;
 }
+function cohortSnapshot(audit){
+  const out={};
+  for(const [level,rows] of Object.entries(audit.levels||{})){
+    const available=rows.filter(row=>row.status==="AVAILABLE");
+    out[level]={totalCohorts:rows.length,availableCohorts:available.length,topAvailable:available.slice(0,8)};
+  }
+  return out;
+}
+
 function diagnosticSummary(dataset){
   const events=dataset.events||[];
   const summary=job.summarizeDataset(events);
@@ -56,6 +66,11 @@ async function main(){
   fs.writeFileSync(path.join(outDir,"spy-15m-checkpoint-midpoint.json"),JSON.stringify(evidenceMidpoint,null,2));
   fs.writeFileSync(path.join(outDir,"spy-15m-checkpoint-structure.json"),JSON.stringify(evidenceStructure,null,2));
 
+  const midpointAudit=cohortAudit.buildCohortAudit(evidenceMidpoint.events,{minResolved:20});
+  const structureAudit=cohortAudit.buildCohortAudit(evidenceStructure.events,{minResolved:20});
+  fs.writeFileSync(path.join(outDir,"spy-15m-cohort-audit-midpoint.json"),JSON.stringify(midpointAudit,null,2));
+  fs.writeFileSync(path.join(outDir,"spy-15m-cohort-audit-structure.json"),JSON.stringify(structureAudit,null,2));
+
   const summary={
     generatedAt:new Date().toISOString(),
     source:evidenceMidpoint.source,
@@ -76,6 +91,11 @@ async function main(){
     checkpointEvidence:{
       midpoint:diagnosticSummary(evidenceMidpoint),
       structure:diagnosticSummary(evidenceStructure)
+    },
+    cohortAudit:{
+      minResolvedSampleSize:20,
+      midpoint:cohortSnapshot(midpointAudit),
+      structure:cohortSnapshot(structureAudit)
     },
     note:"Checkpoint evidence reconstructs the first setup state observable at completed 5m checkpoints inside each 15m bar. Outcome measurement begins after the observation checkpoint, so information already contained in that checkpoint is not reused as future evidence. Diagnostic win rates are research outputs only and are not forecasts or Trade Coach guidance."
   };
