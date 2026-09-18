@@ -29,6 +29,14 @@ function normalizeRR({entry,stop,target,direction}={}){
   return {valid:true,risk:Number(risk.toFixed(8)),reward:Number(reward.toFixed(8)),rr:Number((reward/risk).toFixed(2))};
 }
 
+function historicalEvidenceStatus(value){
+  if(!value||!(Number(value.sampleSize)>0)) return "NOT_AVAILABLE";
+  const explicit=String(value.status||"").toUpperCase();
+  if(["AVAILABLE","INSUFFICIENT_SAMPLE","NOT_AVAILABLE"].includes(explicit)) return explicit;
+  if(value.sufficient===false) return "INSUFFICIENT_SAMPLE";
+  return "AVAILABLE";
+}
+
 function evidenceStatus(direction,label,value){
   if(!direction||value==null) return {label,status:"UNKNOWN",value:value??null};
   const upper=String(value).toUpperCase();
@@ -68,7 +76,7 @@ function buildSetupContext({
     evidenceStatus(direction,"BREADTH",indexBreadth?.context||null),
     {label:"SECTOR_BREADTH",status:evidenceStatus(direction,"BREADTH",sectorBreadth?.context||null).status,value:sectorBreadth?.context||null},
     {label:"RISK_REWARD",status:rrGate.status,value:rrGate.rr},
-    {label:"HISTORICAL_EVIDENCE",status:historicalEvidence?.sampleSize>0?"AVAILABLE":"NOT_AVAILABLE",value:historicalEvidence||null}
+    {label:"HISTORICAL_EVIDENCE",status:historicalEvidenceStatus(historicalEvidence),value:historicalEvidence||null}
   ];
 
   const why=evidence.map(item=>({...item,explanatoryOnly:item.label!=="SETUP"&&item.label!=="RISK_REWARD"}));
@@ -78,6 +86,6 @@ function buildSetupContext({
   };
 }
 
-const setupContextApi={validDirection,resolvePrimarySignal,normalizeRR,evidenceStatus,buildSetupContext};
+const setupContextApi={validDirection,resolvePrimarySignal,normalizeRR,historicalEvidenceStatus,evidenceStatus,buildSetupContext};
 if(typeof module!=="undefined"&&module.exports) module.exports=setupContextApi;
 if(typeof globalThis!=="undefined") globalThis.StratSetupContext=setupContextApi;
