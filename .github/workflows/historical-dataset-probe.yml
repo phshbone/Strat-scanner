@@ -17,6 +17,7 @@ on:
       - "historical-event-builder.js"
       - "historical-path-resolver.js"
       - "historical-intrabar-reconstruction.js"
+      - "historical-cohort-audit.js"
 
 permissions:
   contents: read
