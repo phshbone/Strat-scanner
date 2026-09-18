@@ -1,7 +1,7 @@
 "use strict";
 
 (async()=>{
-  const assert=require("assert");
+  const assert=(await import("node:assert")).default;
   const dbmod=await import("../worker/historical-db.mjs");
   let pass=0;
   const t=(name,fn)=>{fn();pass++;console.log("PASS "+pass+": "+name);};
