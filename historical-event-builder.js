@@ -219,6 +219,9 @@ function buildHistoricalEvent({
     mfeR:null,
     maeR:null,
     excursionMeasurement:"DEFERRED_UNTIL_INTRABAR_SAFE",
+    evidenceEligible:false,
+    sampleConstruction:"COMPLETED_PARENT_BAR_SETUP_STATE",
+    lookaheadRisk:"INTRABAR_SETUP_ACTIVATION_NOT_RECONSTRUCTED",
     ...ctx
   };
 }
