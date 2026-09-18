@@ -1,0 +1,47 @@
+name: Historical Dataset Probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      outputsize:
+        description: Twelve Data bars to inspect
+        required: false
+        default: "1000"
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/historical-dataset-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      HISTORICAL_PROBE_SYMBOL: SPY
+      HISTORICAL_PROBE_TIMEFRAME: "15"
+      HISTORICAL_PROBE_OUTPUTSIZE: ${{ github.event_name == 'workflow_dispatch' && inputs.outputsize || '1000' }}
+      HISTORICAL_PROBE_HORIZON_BARS: "20"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build real SPY historical probe
+        run: node scripts/probe-historical-dataset.js | tee historical-probe.log
+
+      - name: Upload historical probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-spy-15m-probe-${{ github.run_id }}
+          path: |
+            artifacts/historical-probe/
+            historical-probe.log
+          retention-days: 14
