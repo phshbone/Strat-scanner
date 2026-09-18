@@ -39,6 +39,8 @@ function classifyOutcome(event){
   const stopHit=e.stopHit===true;
   const order=e.firstHit||null;
 
+  if(e.sequenceAmbiguous===true) return {status:"AMBIGUOUS",reason:e.ambiguityReason||"SEQUENCE_UNKNOWN"};
+
   if(magnitudeHit && stopHit){
     if(order==="MAGNITUDE") return {status:"WIN",reason:"MAGNITUDE_FIRST"};
     if(order==="STOP") return {status:"LOSS",reason:"STOP_FIRST"};
