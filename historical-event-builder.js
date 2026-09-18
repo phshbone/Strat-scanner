@@ -18,9 +18,9 @@ function timestampForBar(bar,index){
   return bar?.semantics?.barOpenTimestamp||bar?.datetime||bar?.time||String(index);
 }
 
-function eventId({symbol,timeframe,bar,index,setup}){
+function eventId({symbol,timeframe,bar,index,setup,stopModel="MIDPOINT"}){
   const period=bar?.semantics?.periodOpenId||timestampForBar(bar,index);
-  return [String(symbol||bar?.symbol||"UNKNOWN").toUpperCase(),String(timeframe||bar?.timeframe||"UNKNOWN").toUpperCase(),period,setup?.name||"UNKNOWN",setup?.direction||"UNKNOWN"].join("|");
+  return [String(symbol||bar?.symbol||"UNKNOWN").toUpperCase(),String(timeframe||bar?.timeframe||"UNKNOWN").toUpperCase(),period,setup?.name||"UNKNOWN",setup?.direction||"UNKNOWN",normalizeStopModel(stopModel)].join("|");
 }
 
 function levelHits(bar,direction,price,kind){
