@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "serve:smoke": "python3 -m http.server 4173 --bind 127.0.0.1",
-    "test:live-smoke": "playwright test tests/live-smoke.spec.js"
+    "test:live-smoke": "playwright test tests/live-smoke.spec.js",
+    "historical:build": "node scripts/build-historical-dataset.js"
   },
   "devDependencies": {
     "@playwright/test": "1.55.0"
