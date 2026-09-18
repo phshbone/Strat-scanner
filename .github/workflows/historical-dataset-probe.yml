@@ -16,6 +16,7 @@ on:
       - "historical-dataset-job.js"
       - "historical-event-builder.js"
       - "historical-path-resolver.js"
+      - "historical-intrabar-reconstruction.js"
 
 permissions:
   contents: read
