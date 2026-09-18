@@ -172,7 +172,7 @@ function buildCheckpointEvents({parentSeries,lowerSeries,stopModel="MIDPOINT",ho
       const progress=progressContext(setup,partial.close);
       const parentOpen=Date.parse(parentBar?.semantics?.barOpenTimestamp||"");
       const observedAt=Date.parse(activationTimestamp||"");
-      const lag=Number.isFinite(parentOpen)&&Number.isFinite(observedAt)?Math.round((observedAt-parentOpen)/60000):null;
+      const lag=Number.isFinite(parentOpen)&&Number.isFinite(observedAt)?Math.round((observedAt-parentOpen)/60000):null;\n      const observationPhase=lag===5?"FIRST_5M":lag===10?"SECOND_5M":lag===15?"CLOSE_15M":lag===null?null:"OTHER";
 
       events.push({
         id:checkpointEventId({symbol:parentSeries.symbol,parentBar,setup,stopModel,activationTimestamp}),
