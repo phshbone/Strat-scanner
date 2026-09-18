@@ -1,7 +1,7 @@
 "use strict";
 
 const live=require("./live-candidates-ui.js");
-const builder=require("./historical-event-builder.js");
+const builder=require("./historical-event-builder.js");\nconst reconstruction=require("./historical-intrabar-reconstruction.js");
 
 function normalizeStopModel(value){return builder.normalizeStopModel(value||"MIDPOINT");}
 
@@ -36,7 +36,7 @@ function buildHistoricalDataset(series,{stopModel="MIDPOINT",horizonBars=20}={})
   };
 }
 
-function summarizeDataset(events=[]){
+function buildEvidenceDataset(parentSeries,lowerSeries,{stopModel="MIDPOINT",horizonBars=20}={}){\n  const model=normalizeStopModel(stopModel);\n  const rebuilt=reconstruction.buildCheckpointEvents({parentSeries,lowerSeries,stopModel:model,horizonBars});\n  return {\n    schemaVersion:1,\n    source:"TWELVE_DATA_VIA_CLOUDFLARE_PROXY",\n    symbol:parentSeries.symbol,\n    timeframe:parentSeries.timeframe,\n    marketType:parentSeries.marketType||null,\n    stopModel:model,\n    barsReceived:parentSeries.bars.length,\n    lowerTimeframeBarsReceived:lowerSeries.bars.length,\n    sampleConstruction:rebuilt.sampleConstruction,\n    successDefinition:rebuilt.successDefinition,\n    events:rebuilt.events,\n    summary:summarizeDataset(rebuilt.events)\n  };\n}\n\nfunction summarizeDataset(events=[]){
   const rows=Array.isArray(events)?events:[];
   const byResolution={},bySetup={};
   for(const event of rows){
@@ -83,4 +83,4 @@ async function writeHistoricalDataset({proxyBase=live.DEFAULT_PROXY_BASE,dataset
   return {written,batches:Math.ceil(dataset.events.length/size)};
 }
 
-module.exports={normalizeStopModel,buildHistoricalDataset,summarizeDataset,buildHistoricalProxyUrl,fetchHistoricalSeries,writeHistoricalDataset};
+module.exports={normalizeStopModel,buildHistoricalDataset,buildEvidenceDataset,summarizeDataset,buildHistoricalProxyUrl,fetchHistoricalSeries,writeHistoricalDataset};
