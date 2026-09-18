@@ -46,11 +46,57 @@ t("stop models produce distinct stable IDs",()=>{
 const url=new URL(job.buildHistoricalProxyUrl({symbol:"SPY",timeframe:"15",outputsize:5000,startDate:"2025-01-01",endDate:"2025-12-31"}));
 t("historical proxy URL includes bounded dates",()=>{assert.equal(url.searchParams.get("start_date"),"2025-01-01");assert.equal(url.searchParams.get("end_date"),"2025-12-31");});
 
+const chunks=job.dateChunks("2026-07-01","2026-07-05",{chunkDays:2});
+t("date chunks are contiguous and bounded",()=>assert.deepEqual(chunks,[
+  {startDate:"2026-07-01",endDate:"2026-07-02"},
+  {startDate:"2026-07-03",endDate:"2026-07-04"},
+  {startDate:"2026-07-05",endDate:"2026-07-05"}
+]));
+
+const merged=job.mergeHistoricalSeries([
+  {symbol:"SPY",timeframe:"15",marketType:"US_EQUITY",bars:[{datetime:"2026-07-01T13:30:00Z"},{datetime:"2026-07-01T13:45:00Z"}]},
+  {symbol:"SPY",timeframe:"15",marketType:"US_EQUITY",bars:[{datetime:"2026-07-01T13:45:00Z"},{datetime:"2026-07-01T14:00:00Z"}]}
+]);
+t("range merge deduplicates overlapping bar timestamps",()=>assert.deepEqual(merged.bars.map(b=>b.datetime),[
+  "2026-07-01T13:30:00Z","2026-07-01T13:45:00Z","2026-07-01T14:00:00Z"
+]));
+
 (async()=>{
   const calls=[];
-  const fakeFetch=async(url,options)=>{calls.push({url,options});return {ok:true,status:200,json:async()=>({written:JSON.parse(options.body).events.length})};};
-  const result=await job.writeHistoricalDataset({proxyBase:"https://worker.example",dataset,token:"SECRET",importId:"fixture",fetchImpl:fakeFetch,batchSize:1});
+  const fakeWriteFetch=async(url,options)=>{calls.push({url,options});return {ok:true,status:200,json:async()=>({written:JSON.parse(options.body).events.length})};};
+  const result=await job.writeHistoricalDataset({proxyBase:"https://worker.example",dataset,token:"SECRET",importId:"fixture",fetchImpl:fakeWriteFetch,batchSize:1});
   t("writer batches through protected Worker endpoint",()=>{assert.equal(result.written,dataset.events.length);assert.equal(calls.length,dataset.events.length);});
   t("writer sends bearer token",()=>assert.equal(calls[0].options.headers.Authorization,"Bearer SECRET"));
+
+  const rangeCalls=[];
+  const fakeRangeFetch=async(requestUrl)=>{
+    const u=new URL(requestUrl);
+    rangeCalls.push(u);
+    const date=u.searchParams.get("start_date");
+    return {
+      ok:true,
+      status:200,
+      json:async()=>({
+        meta:{interval:"15min"},
+        values:[
+          {datetime:date+" 13:30:00",open:"100",high:"101",low:"99",close:"100.5"},
+          {datetime:date+" 13:45:00",open:"100.5",high:"102",low:"100",close:"101"}
+        ]
+      })
+    };
+  };
+  const ranged=await job.fetchHistoricalSeriesRange({
+    proxyBase:"https://worker.example",
+    symbol:"SPY",
+    timeframe:"15",
+    startDate:"2026-07-01",
+    endDate:"2026-07-02",
+    chunkDays:1,
+    delayMs:0,
+    fetchImpl:fakeRangeFetch
+  });
+  t("range fetch requests each bounded chunk",()=>assert.equal(rangeCalls.length,2));
+  t("range fetch merges normalized bars",()=>{assert.equal(ranged.bars.length,4);assert.equal(ranged.range.chunksRequested,2);});
+
   console.log("\n"+pass+"/"+pass+" PASS historical dataset job validation");
 })().catch(error=>{console.error(error);process.exit(1);});
