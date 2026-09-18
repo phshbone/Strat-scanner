@@ -83,6 +83,58 @@ async function fetchHistoricalSeries({proxyBase=live.DEFAULT_PROXY_BASE,symbol,t
   return live.normalizePayload(await response.json(),{symbol,timeframe});
 }
 
+function isoDate(value){
+  const d=value instanceof Date?value:new Date(String(value)+"T00:00:00Z");
+  if(Number.isNaN(d.getTime())) throw new Error("valid YYYY-MM-DD date required");
+  return d.toISOString().slice(0,10);
+}
+
+function dateChunks(startDate,endDate,{chunkDays=30}={}){
+  const start=new Date(isoDate(startDate)+"T00:00:00Z");
+  const end=new Date(isoDate(endDate)+"T00:00:00Z");
+  if(start>end) throw new Error("startDate must be on or before endDate");
+  const days=Math.max(1,Math.min(120,Number(chunkDays)||30));
+  const chunks=[];
+  let cursor=new Date(start);
+  while(cursor<=end){
+    const chunkStart=new Date(cursor);
+    const chunkEnd=new Date(cursor);
+    chunkEnd.setUTCDate(chunkEnd.getUTCDate()+days-1);
+    if(chunkEnd>end) chunkEnd.setTime(end.getTime());
+    chunks.push({startDate:isoDate(chunkStart),endDate:isoDate(chunkEnd)});
+    cursor=new Date(chunkEnd);
+    cursor.setUTCDate(cursor.getUTCDate()+1);
+  }
+  return chunks;
+}
+
+function mergeHistoricalSeries(seriesList){
+  const list=(Array.isArray(seriesList)?seriesList:[]).filter(Boolean);
+  if(!list.length) throw new Error("historical series list required");
+  const first=list[0],seen=new Map();
+  for(const series of list){
+    if(series.symbol!==first.symbol||series.timeframe!==first.timeframe) throw new Error("historical series identity mismatch");
+    for(const bar of series.bars||[]){
+      const key=bar?.semantics?.barOpenTimestamp||bar?.datetime||bar?.time;
+      if(key) seen.set(String(key),bar);
+    }
+  }
+  const bars=Array.from(seen.values()).sort((a,b)=>String(a?.semantics?.barOpenTimestamp||a.datetime||a.time).localeCompare(String(b?.semantics?.barOpenTimestamp||b.datetime||b.time)));
+  return {...first,bars};
+}
+
+async function fetchHistoricalSeriesRange({proxyBase=live.DEFAULT_PROXY_BASE,symbol,timeframe,startDate,endDate,chunkDays=30,outputsize=5000,delayMs=8000,fetchImpl=globalThis.fetch}={}){
+  const chunks=dateChunks(startDate,endDate,{chunkDays});
+  const series=[];
+  for(let i=0;i<chunks.length;i++){
+    const chunk=chunks[i];
+    series.push(await fetchHistoricalSeries({proxyBase,symbol,timeframe,outputsize,startDate:chunk.startDate,endDate:chunk.endDate,fetchImpl}));
+    if(delayMs>0&&i<chunks.length-1) await new Promise(resolve=>setTimeout(resolve,delayMs));
+  }
+  const merged=mergeHistoricalSeries(series);
+  return {...merged,range:{startDate:isoDate(startDate),endDate:isoDate(endDate),chunkDays,chunksRequested:chunks.length}};
+}
+
 async function writeHistoricalDataset({proxyBase=live.DEFAULT_PROXY_BASE,dataset,token,importId,fetchImpl=globalThis.fetch,batchSize=400}={}){
   if(!dataset||!Array.isArray(dataset.events)) throw new Error("dataset required");
   if(!token) throw new Error("HISTORICAL_DB_WRITE_TOKEN required");
@@ -103,4 +155,4 @@ async function writeHistoricalDataset({proxyBase=live.DEFAULT_PROXY_BASE,dataset
   return {written,batches:Math.ceil(dataset.events.length/size)};
 }
 
-module.exports={normalizeStopModel,buildHistoricalDataset,buildEvidenceDataset,summarizeDataset,buildHistoricalProxyUrl,fetchHistoricalSeries,writeHistoricalDataset};
+module.exports={normalizeStopModel,buildHistoricalDataset,buildEvidenceDataset,summarizeDataset,buildHistoricalProxyUrl,fetchHistoricalSeries,isoDate,dateChunks,mergeHistoricalSeries,fetchHistoricalSeriesRange,writeHistoricalDataset};
