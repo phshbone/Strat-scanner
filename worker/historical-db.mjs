@@ -73,6 +73,9 @@ function normalizeEvent(input={}){
     provider:upper(s.provider),
     provider_aggregation:s.providerAggregation||null,
     semantic_key:input.semanticKey||null,
+    evidence_eligible:input.evidenceEligible===true?1:0,
+    sample_construction:upper(input.sampleConstruction)||"COMPLETED_PARENT_BAR_SETUP_STATE",
+    lookahead_risk:upper(input.lookaheadRisk),
     schema_version:SCHEMA_VERSION,
     import_id:input.importId||null,
     event_json:JSON.stringify(input)
@@ -86,8 +89,8 @@ const INSERT_SQL=[
   "time_to_magnitude_bars,realized_r,ftfc_alignment,market_alignment,sector_alignment,",
   "elder_state,minervini_state,exhaustion_state,sss50_state,price_bucket,market_timezone,",
   "session,extended_hours_included,bar_anchor,bar_anchor_offset_minutes,provider,",
-  "provider_aggregation,semantic_key,schema_version,import_id,event_json,updated_at",
-  ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",
+  "provider_aggregation,semantic_key,evidence_eligible,sample_construction,lookahead_risk,schema_version,import_id,event_json,updated_at",
+  ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",
   "ON CONFLICT(event_id) DO UPDATE SET ",
   "symbol=excluded.symbol,signal_timestamp=excluded.signal_timestamp,setup_id=excluded.setup_id,",
   "direction=excluded.direction,timeframe=excluded.timeframe,market_type=excluded.market_type,",
@@ -103,6 +106,7 @@ const INSERT_SQL=[
   "extended_hours_included=excluded.extended_hours_included,bar_anchor=excluded.bar_anchor,",
   "bar_anchor_offset_minutes=excluded.bar_anchor_offset_minutes,provider=excluded.provider,",
   "provider_aggregation=excluded.provider_aggregation,semantic_key=excluded.semantic_key,",
+  "evidence_eligible=excluded.evidence_eligible,sample_construction=excluded.sample_construction,lookahead_risk=excluded.lookahead_risk,",
   "schema_version=excluded.schema_version,import_id=excluded.import_id,event_json=excluded.event_json,",
   "updated_at=CURRENT_TIMESTAMP"
 ].join("");
@@ -113,7 +117,7 @@ const ROW_FIELDS=[
  "time_to_magnitude_bars","realized_r","ftfc_alignment","market_alignment","sector_alignment",
  "elder_state","minervini_state","exhaustion_state","sss50_state","price_bucket","market_timezone",
  "session","extended_hours_included","bar_anchor","bar_anchor_offset_minutes","provider",
- "provider_aggregation","semantic_key","schema_version","import_id","event_json"
+ "provider_aggregation","semantic_key","evidence_eligible","sample_construction","lookahead_risk","schema_version","import_id","event_json"
 ];
 
 async function upsertHistoricalEvents(db,events,{importId=null}={}){
@@ -147,7 +151,7 @@ function normalizeEvidenceQuery(source){
 }
 
 function whereFor(query,{includeContext}={}){
-  const clauses=["setup_id=?","direction=?","timeframe=?"];
+  const clauses=["evidence_eligible=1","setup_id=?","direction=?","timeframe=?"];
   const params=[query.setup_id,query.direction,query.timeframe];
   if(query.market_type){clauses.push("market_type=?");params.push(query.market_type);}
   for(const [key,column] of Object.entries(PROFILE_FILTERS)){
