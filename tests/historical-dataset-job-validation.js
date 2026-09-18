@@ -96,7 +96,25 @@ t("range merge deduplicates overlapping bar timestamps",()=>assert.deepEqual(mer
     fetchImpl:fakeRangeFetch
   });
   t("range fetch requests each bounded chunk",()=>assert.equal(rangeCalls.length,2));
-  t("range fetch merges normalized bars",()=>{assert.equal(ranged.bars.length,4);assert.equal(ranged.range.chunksRequested,2);});
+  t("range fetch merges normalized bars",()=>{assert.equal(ranged.bars.length,4);assert.equal(ranged.range.chunksRequested,2);assert.equal(ranged.range.retryCount,0);});
+
+  let retryAttempts=0;
+  const fakeThrottleFetch=async(requestUrl)=>{
+    retryAttempts+=1;
+    if(retryAttempts===1) return {ok:false,status:429,json:async()=>({status:"error",message:"rate limit"})};
+    const u=new URL(requestUrl);
+    const date=u.searchParams.get("start_date");
+    return {ok:true,status:200,json:async()=>({meta:{interval:"15min"},values:[
+      {datetime:date+" 13:30:00",open:"100",high:"101",low:"99",close:"100.5"},
+      {datetime:date+" 13:45:00",open:"100.5",high:"102",low:"100",close:"101"}
+    ]})};
+  };
+  const retried=await job.fetchHistoricalSeriesRange({
+    proxyBase:"https://worker.example",symbol:"SPY",timeframe:"15",
+    startDate:"2026-07-01",endDate:"2026-07-01",
+    chunkDays:1,delayMs:0,maxAttempts:2,retryBaseMs:0,fetchImpl:fakeThrottleFetch
+  });
+  t("range fetch retries provider 429",()=>{assert.equal(retryAttempts,2);assert.equal(retried.range.retryCount,1);assert.equal(retried.bars.length,2);});
 
   console.log("\n"+pass+"/"+pass+" PASS historical dataset job validation");
 })().catch(error=>{console.error(error);process.exit(1);});
