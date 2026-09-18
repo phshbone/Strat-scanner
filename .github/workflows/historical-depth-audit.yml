@@ -11,12 +11,15 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/historical-depth-audit.yml"
       - "scripts/probe-historical-depth.js"
       - "historical-temporal-audit.js"
       - "historical-cohort-audit.js"
       - "historical-intrabar-reconstruction.js"
       - "historical-dataset-job.js"
+
+concurrency:
+  group: historical-depth-audit-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -40,7 +43,9 @@ jobs:
           node-version: "22"
 
       - name: Build deeper SPY historical evidence audit
-        run: node scripts/probe-historical-depth.js | tee historical-depth.log
+        run: |
+          set -o pipefail
+          node scripts/probe-historical-depth.js | tee historical-depth.log
 
       - name: Upload historical depth evidence
         uses: actions/upload-artifact@v4
