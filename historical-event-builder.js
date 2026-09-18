@@ -186,7 +186,7 @@ function buildHistoricalEvent({
   const path=evaluateEventPath({bars,signalIndex,setup,stopModel,horizonBars,calculateTrade});
   const ctx=context&&typeof context==="object"?context:{};
   return {
-    id:eventId({symbol,timeframe,bar,index:signalIndex,setup}),
+    id:eventId({symbol,timeframe,bar,index:signalIndex,setup,stopModel}),
     ticker:String(symbol||bar.symbol||"").toUpperCase()||null,
     timestamp:timestampForBar(bar,signalIndex),
     setup:setup.name,
