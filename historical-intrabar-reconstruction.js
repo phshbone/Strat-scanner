@@ -172,7 +172,8 @@ function buildCheckpointEvents({parentSeries,lowerSeries,stopModel="MIDPOINT",ho
       const progress=progressContext(setup,partial.close);
       const parentOpen=Date.parse(parentBar?.semantics?.barOpenTimestamp||"");
       const observedAt=Date.parse(activationTimestamp||"");
-      const lag=Number.isFinite(parentOpen)&&Number.isFinite(observedAt)?Math.round((observedAt-parentOpen)/60000):null;\n      const observationPhase=lag===5?"FIRST_5M":lag===10?"SECOND_5M":lag===15?"CLOSE_15M":lag===null?null:"OTHER";
+      const lag=Number.isFinite(parentOpen)&&Number.isFinite(observedAt)?Math.round((observedAt-parentOpen)/60000):null;
+      const observationPhase=lag===5?"FIRST_5M":lag===10?"SECOND_5M":lag===15?"CLOSE_15M":lag===null?null:"OTHER";
 
       events.push({
         id:checkpointEventId({symbol:parentSeries.symbol,parentBar,setup,stopModel,activationTimestamp}),
@@ -183,6 +184,7 @@ function buildCheckpointEvents({parentSeries,lowerSeries,stopModel="MIDPOINT",ho
         activationTimestamp,
         activationPrice:Number(partial.close),
         observationLagMinutes:lag,
+        observationPhase,
         setup:setup.name,setupId:setup.name,direction:setup.direction,timeframe:"15",marketType:parentSeries.marketType||parentBar?.semantics?.marketType||null,
         trigger:Number(setup.trigger),entry:Number(setup.trigger),stopModel:builder.normalizeStopModel(stopModel),stop,magnitude:Number(setup.magnitude),
         dataSemantics:parentBar.semantics||null,semanticKey:parentBar.semanticKey||null,currentType:setup.currentType||null,pathResolved:true,
