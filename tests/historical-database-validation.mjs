@@ -96,9 +96,14 @@
   };
 
   const evidence=await dbmod.queryHistoricalEvidence(fakeDb,q);
-  t("query keeps exact and baseline separate",()=>{assert.equal(evidence.sampleSize,12);assert.equal(evidence.broaderBaseline.sampleSize,40);assert.equal(evidence.status,"INSUFFICIENT_SAMPLE");assert.equal(evidence.sampleConstruction,dbmod.EVIDENCE_SAMPLE_CONSTRUCTION);});\n  t("query carries temporal coverage without confidence scoring",()=>{assert.equal(evidence.temporalCoverage.coverageStatus,"TEMPORAL_COVERAGE");assert.equal(evidence.temporalCoverage.populatedPeriods,3);assert.equal(evidence.temporalCoverage.populatedRateMinPct,50);assert.equal(evidence.temporalCoverage.populatedRateMaxPct,70);assert.ok(!("confidence" in evidence.temporalCoverage));});
-  const temporal=dbmod.temporalSummary([{period:"2026-04",sample_size:12,resolved_sample_size:10,wins:6,losses:4},{period:"2026-05",sample_size:9,resolved_sample_size:9,wins:5,losses:4}],{minResolvedPerPeriod:10,minPopulatedPeriods:2});\n  t("temporal summary keeps weak monthly coverage explicit",()=>{assert.equal(temporal.coverageStatus,"LIMITED_PERIOD_COVERAGE");assert.equal(temporal.populatedPeriods,1);});\n\n  const health=await dbmod.historicalDbHealth(fakeDb);
+  t("query keeps exact and baseline separate",()=>{assert.equal(evidence.sampleSize,12);assert.equal(evidence.broaderBaseline.sampleSize,40);assert.equal(evidence.status,"INSUFFICIENT_SAMPLE");assert.equal(evidence.sampleConstruction,dbmod.EVIDENCE_SAMPLE_CONSTRUCTION);});
+  t("query carries temporal coverage without confidence scoring",()=>{assert.equal(evidence.temporalCoverage.coverageStatus,"TEMPORAL_COVERAGE");assert.equal(evidence.temporalCoverage.populatedPeriods,3);assert.equal(evidence.temporalCoverage.populatedRateMinPct,50);assert.equal(evidence.temporalCoverage.populatedRateMaxPct,70);assert.ok(!("confidence" in evidence.temporalCoverage));});
+  const temporal=dbmod.temporalSummary([{period:"2026-04",sample_size:12,resolved_sample_size:10,wins:6,losses:4},{period:"2026-05",sample_size:9,resolved_sample_size:9,wins:5,losses:4}],{minResolvedPerPeriod:10,minPopulatedPeriods:2});
+  t("temporal summary keeps weak monthly coverage explicit",()=>{assert.equal(temporal.coverageStatus,"LIMITED_PERIOD_COVERAGE");assert.equal(temporal.populatedPeriods,1);});
+
+  const health=await dbmod.historicalDbHealth(fakeDb);
   t("health reports eligible database population",()=>{assert.equal(health.configured,true);assert.equal(health.migrated,true);assert.equal(health.eventCount,123);assert.equal(health.eligibleEventCount,80);});
 
-  console.log("\n"+pass+"/"+pass+" PASS historical database validation");
+  console.log("
+"+pass+"/"+pass+" PASS historical database validation");
 })().catch(error=>{console.error(error);process.exit(1);});
