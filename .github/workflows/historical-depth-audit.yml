@@ -1,0 +1,48 @@
+name: Historical Depth Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: Calendar days of SPY history to reconstruct
+        required: false
+        default: "180"
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/historical-depth-audit.yml"
+      - "scripts/probe-historical-depth.js"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HISTORICAL_DEPTH_SYMBOL: SPY
+      HISTORICAL_DEPTH_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.days || '180' }}
+      HISTORICAL_DEPTH_CHUNK_DAYS: "30"
+      HISTORICAL_DEPTH_DELAY_MS: "8000"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build deeper SPY historical evidence audit
+        run: node scripts/probe-historical-depth.js | tee historical-depth.log
+
+      - name: Upload historical depth evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-spy-depth-${{ github.run_id }}
+          path: |
+            artifacts/historical-depth/
+            historical-depth.log
+          retention-days: 14
