@@ -12,6 +12,10 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/historical-dataset-probe.yml"
+      - "scripts/probe-historical-dataset.js"
+      - "historical-dataset-job.js"
+      - "historical-event-builder.js"
+      - "historical-path-resolver.js"
 
 permissions:
   contents: read
