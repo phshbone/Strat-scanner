@@ -11,13 +11,15 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/historical-dataset-probe.yml"
       - "scripts/probe-historical-dataset.js"
-      - "historical-dataset-job.js"
       - "historical-event-builder.js"
       - "historical-path-resolver.js"
       - "historical-intrabar-reconstruction.js"
       - "historical-cohort-audit.js"
+
+concurrency:
+  group: historical-dataset-probe-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -41,7 +43,9 @@ jobs:
           node-version: "22"
 
       - name: Build real SPY historical probe
-        run: node scripts/probe-historical-dataset.js | tee historical-probe.log
+        run: |
+          set -o pipefail
+          node scripts/probe-historical-dataset.js | tee historical-probe.log
 
       - name: Upload historical probe evidence
         uses: actions/upload-artifact@v4
