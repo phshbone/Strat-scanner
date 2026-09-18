@@ -1,7 +1,8 @@
 "use strict";
 
 const live=require("./live-candidates-ui.js");
-const builder=require("./historical-event-builder.js");\nconst reconstruction=require("./historical-intrabar-reconstruction.js");
+const builder=require("./historical-event-builder.js");
+const reconstruction=require("./historical-intrabar-reconstruction.js");
 
 function normalizeStopModel(value){return builder.normalizeStopModel(value||"MIDPOINT");}
 
@@ -36,7 +37,26 @@ function buildHistoricalDataset(series,{stopModel="MIDPOINT",horizonBars=20}={})
   };
 }
 
-function buildEvidenceDataset(parentSeries,lowerSeries,{stopModel="MIDPOINT",horizonBars=20}={}){\n  const model=normalizeStopModel(stopModel);\n  const rebuilt=reconstruction.buildCheckpointEvents({parentSeries,lowerSeries,stopModel:model,horizonBars});\n  return {\n    schemaVersion:1,\n    source:"TWELVE_DATA_VIA_CLOUDFLARE_PROXY",\n    symbol:parentSeries.symbol,\n    timeframe:parentSeries.timeframe,\n    marketType:parentSeries.marketType||null,\n    stopModel:model,\n    barsReceived:parentSeries.bars.length,\n    lowerTimeframeBarsReceived:lowerSeries.bars.length,\n    sampleConstruction:rebuilt.sampleConstruction,\n    successDefinition:rebuilt.successDefinition,\n    events:rebuilt.events,\n    summary:summarizeDataset(rebuilt.events)\n  };\n}\n\nfunction summarizeDataset(events=[]){
+function buildEvidenceDataset(parentSeries,lowerSeries,{stopModel="MIDPOINT",horizonBars=20}={}){
+  const model=normalizeStopModel(stopModel);
+  const rebuilt=reconstruction.buildCheckpointEvents({parentSeries,lowerSeries,stopModel:model,horizonBars});
+  return {
+    schemaVersion:1,
+    source:"TWELVE_DATA_VIA_CLOUDFLARE_PROXY",
+    symbol:parentSeries.symbol,
+    timeframe:parentSeries.timeframe,
+    marketType:parentSeries.marketType||null,
+    stopModel:model,
+    barsReceived:parentSeries.bars.length,
+    lowerTimeframeBarsReceived:lowerSeries.bars.length,
+    sampleConstruction:rebuilt.sampleConstruction,
+    successDefinition:rebuilt.successDefinition,
+    events:rebuilt.events,
+    summary:summarizeDataset(rebuilt.events)
+  };
+}
+
+function summarizeDataset(events=[]){
   const rows=Array.isArray(events)?events:[];
   const byResolution={},bySetup={};
   for(const event of rows){
@@ -57,7 +77,7 @@ function buildHistoricalProxyUrl({proxyBase=live.DEFAULT_PROXY_BASE,symbol,timef
 
 async function fetchHistoricalSeries({proxyBase=live.DEFAULT_PROXY_BASE,symbol,timeframe,outputsize=5000,startDate=null,endDate=null,fetchImpl=globalThis.fetch}={}){
   if(typeof fetchImpl!=="function") throw new Error("fetch implementation required");
-  const url=buildHistoricalProxyUrl({proxyBase,symbol,timeframe,outputsize,startDate,endDate});
+  const url=buildHistoricalProxyUrl({symbol,timeframe,outputsize,startDate,endDate});
   const response=await fetchImpl(url,{headers:{Accept:"application/json"}});
   if(!response||response.ok===false) throw new Error("historical market-data request failed: HTTP "+(response?.status||"error"));
   return live.normalizePayload(await response.json(),{symbol,timeframe});
