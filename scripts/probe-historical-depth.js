@@ -4,6 +4,7 @@ const fs=require("fs");
 const path=require("path");
 const job=require("../historical-dataset-job.js");
 const audit=require("../historical-cohort-audit.js");
+const temporal=require("../historical-temporal-audit.js");
 
 function yyyyMmDd(date){return date.toISOString().slice(0,10);}
 function countAvailable(rows=[]){return rows.filter(row=>row.status==="AVAILABLE").length;}
@@ -58,12 +59,18 @@ async function main(){
   const structure=job.buildEvidenceDataset(parentSeries,lowerSeries,{stopModel:"STRUCTURE",horizonBars:20});
   const midpointAudit=audit.buildCohortAudit(midpoint.events,{minResolved:20});
   const structureAudit=audit.buildCohortAudit(structure.events,{minResolved:20});
+  const midpointExact=midpointAudit.levels.exactCheckpoint.filter(row=>row.status==="AVAILABLE");
+  const structureExact=structureAudit.levels.exactCheckpoint.filter(row=>row.status==="AVAILABLE");
+  const midpointTemporal=temporal.auditsForCohorts(midpoint.events,midpointExact,{minResolvedPerPeriod:10,minPopulatedPeriods:3});
+  const structureTemporal=temporal.auditsForCohorts(structure.events,structureExact,{minResolvedPerPeriod:10,minPopulatedPeriods:3});
 
   fs.mkdirSync(outDir,{recursive:true});
   fs.writeFileSync(path.join(outDir,"spy-15m-midpoint-evidence.json"),JSON.stringify(midpoint,null,2));
   fs.writeFileSync(path.join(outDir,"spy-15m-structure-evidence.json"),JSON.stringify(structure,null,2));
   fs.writeFileSync(path.join(outDir,"spy-15m-midpoint-cohorts.json"),JSON.stringify(midpointAudit,null,2));
   fs.writeFileSync(path.join(outDir,"spy-15m-structure-cohorts.json"),JSON.stringify(structureAudit,null,2));
+  fs.writeFileSync(path.join(outDir,"spy-15m-midpoint-temporal.json"),JSON.stringify(midpointTemporal,null,2));
+  fs.writeFileSync(path.join(outDir,"spy-15m-structure-temporal.json"),JSON.stringify(structureTemporal,null,2));
 
   const summary={
     generatedAt:new Date().toISOString(),
@@ -77,9 +84,9 @@ async function main(){
     lowerChunks:lowerSeries.range?.chunksRequested||null,
     sampleConstruction:midpoint.sampleConstruction,
     successDefinition:midpoint.successDefinition,
-    midpoint:{...datasetSummary(midpoint),cohorts:auditSummary(midpointAudit)},
-    structure:{...datasetSummary(structure),cohorts:auditSummary(structureAudit)},
-    note:"Research evidence from first-observable completed 5m checkpoints inside 15m bars. Percentages are descriptive historical diagnostics, not forecasts or trade recommendations."
+    midpoint:{...datasetSummary(midpoint),cohorts:auditSummary(midpointAudit),temporalExact:midpointTemporal},
+    structure:{...datasetSummary(structure),cohorts:auditSummary(structureAudit),temporalExact:structureTemporal},
+    note:"Research evidence from first-observable completed 5m checkpoints inside 15m bars. Percentages and temporal slices are descriptive historical diagnostics, not forecasts, confidence scores, or trade recommendations."
   };
   fs.writeFileSync(path.join(outDir,"summary.json"),JSON.stringify(summary,null,2));
   console.log(JSON.stringify(summary,null,2));
