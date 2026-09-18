@@ -5,6 +5,8 @@ const DEFAULT_MIN_RESOLVED=20;
 const MAX_WRITE_BATCH=500;
 const EVIDENCE_SAMPLE_CONSTRUCTION="LOWER_5M_CHECKPOINT_FIRST_OBSERVABLE";
 const EVIDENCE_SUCCESS_DEFINITION="MAGNITUDE_BEFORE_STOP_AFTER_OBSERVATION_CHECKPOINT";
+const DEFAULT_MIN_RESOLVED_PER_PERIOD=10;
+const DEFAULT_MIN_POPULATED_PERIODS=3;
 
 const CONTEXT_FILTERS=Object.freeze({
   ftfc_alignment:"ftfc_alignment",
@@ -124,9 +126,13 @@ function normalizeEvidenceQuery(source){
   if(!setupId||!["BULLISH","BEARISH"].includes(direction)||!timeframe) throw new Error("setup, direction, and timeframe are required");
   const minRaw=Number(get("min_resolved")||DEFAULT_MIN_RESOLVED);
   const minResolved=Number.isInteger(minRaw)&&minRaw>0&&minRaw<=10000?minRaw:DEFAULT_MIN_RESOLVED;
+  const minPeriodRaw=Number(get("min_resolved_period")||DEFAULT_MIN_RESOLVED_PER_PERIOD);
+  const minResolvedPerPeriod=Number.isInteger(minPeriodRaw)&&minPeriodRaw>0&&minPeriodRaw<=1000?minPeriodRaw:DEFAULT_MIN_RESOLVED_PER_PERIOD;
+  const minPeriodsRaw=Number(get("min_populated_periods")||DEFAULT_MIN_POPULATED_PERIODS);
+  const minPopulatedPeriods=Number.isInteger(minPeriodsRaw)&&minPeriodsRaw>0&&minPeriodsRaw<=24?minPeriodsRaw:DEFAULT_MIN_POPULATED_PERIODS;
   const requestedConstruction=upper(get("sample_construction")||EVIDENCE_SAMPLE_CONSTRUCTION);
   if(requestedConstruction!==EVIDENCE_SAMPLE_CONSTRUCTION) throw new Error("unsupported historical sample construction");
-  const out={setup_id:setupId,direction,timeframe,market_type:upper(get("market_type")),min_resolved:minResolved,sample_construction:requestedConstruction};
+  const out={setup_id:setupId,direction,timeframe,market_type:upper(get("market_type")),min_resolved:minResolved,min_resolved_period:minResolvedPerPeriod,min_populated_periods:minPopulatedPeriods,sample_construction:requestedConstruction};
   for(const key of Object.keys(PROFILE_FILTERS)){
     if(key==="sample_construction") continue;
     const v=get(key);
@@ -185,14 +191,73 @@ async function aggregate(db,where,minResolved){
   return summary(row||{},minResolved);
 }
 
+const TEMPORAL_SELECT=[
+ "SELECT substr(signal_timestamp,1,7) AS period,",
+ " COUNT(*) AS sample_size,",
+ " SUM(CASE WHEN resolution IN ('WIN','LOSS') THEN 1 ELSE 0 END) AS resolved_sample_size,",
+ " SUM(CASE WHEN resolution='WIN' THEN 1 ELSE 0 END) AS wins,",
+ " SUM(CASE WHEN resolution='LOSS' THEN 1 ELSE 0 END) AS losses,",
+ " SUM(CASE WHEN sequence_ambiguous=1 OR resolution='AMBIGUOUS' THEN 1 ELSE 0 END) AS ambiguous,",
+ " SUM(CASE WHEN resolution NOT IN ('WIN','LOSS','AMBIGUOUS','OPEN') THEN 1 ELSE 0 END) AS unresolved",
+ " FROM historical_events WHERE "
+].join("");
+
+function temporalSummary(rows=[],{
+  minResolvedPerPeriod=DEFAULT_MIN_RESOLVED_PER_PERIOD,
+  minPopulatedPeriods=DEFAULT_MIN_POPULATED_PERIODS
+}={}){
+  const periods=(Array.isArray(rows)?rows:[]).filter(row=>row?.period).map(row=>{
+    const resolved=Number(row.resolved_sample_size)||0,wins=Number(row.wins)||0;
+    return {
+      period:String(row.period),
+      sampleSize:Number(row.sample_size)||0,
+      resolvedSampleSize:resolved,
+      wins,
+      losses:Number(row.losses)||0,
+      successRate:resolved?wins/resolved:null,
+      successRatePct:resolved?Number(((wins/resolved)*100).toFixed(1)):null,
+      ambiguous:Number(row.ambiguous)||0,
+      unresolved:Number(row.unresolved)||0,
+      populated:resolved>=minResolvedPerPeriod,
+      minResolvedPerPeriod
+    };
+  }).sort((a,b)=>a.period.localeCompare(b.period));
+  const populated=periods.filter(row=>row.populated&&row.successRatePct!==null);
+  const rates=populated.map(row=>row.successRatePct);
+  return {
+    coverageStatus:periods.length===0?"NO_DATA":populated.length>=minPopulatedPeriods?"TEMPORAL_COVERAGE":"LIMITED_PERIOD_COVERAGE",
+    periods,
+    populatedPeriods:populated.length,
+    minPopulatedPeriods,
+    minResolvedPerPeriod,
+    earliestPeriod:periods[0]?.period||null,
+    latestPeriod:periods.at(-1)?.period||null,
+    populatedRateMinPct:rates.length?Math.min(...rates):null,
+    populatedRateMaxPct:rates.length?Math.max(...rates):null,
+    populatedRateSpreadPct:rates.length?Number((Math.max(...rates)-Math.min(...rates)).toFixed(1)):null,
+    note:"Temporal slices are descriptive diagnostics. Variation is reported rather than converted into a prediction or confidence score."
+  };
+}
+
+async function aggregateTemporal(db,where,options={}){
+  const statement=db.prepare(TEMPORAL_SELECT+where.sql+" GROUP BY substr(signal_timestamp,1,7) ORDER BY period").bind(...where.params);
+  const result=await statement.all();
+  return temporalSummary(result?.results||[],options);
+}
+
 async function queryHistoricalEvidence(db,source){
   if(!db||typeof db.prepare!=="function") throw new Error("historical database binding unavailable");
   const query=normalizeEvidenceQuery(source);
-  const exact=await aggregate(db,whereFor(query,{includeContext:true}),query.min_resolved);
-  const baseline=await aggregate(db,whereFor(query,{includeContext:false}),query.min_resolved);
+  const exactWhere=whereFor(query,{includeContext:true});
+  const baselineWhere=whereFor(query,{includeContext:false});
+  const exact=await aggregate(db,exactWhere,query.min_resolved);
+  const baseline=await aggregate(db,baselineWhere,query.min_resolved);
+  const temporalOptions={minResolvedPerPeriod:query.min_resolved_period,minPopulatedPeriods:query.min_populated_periods};
+  const temporalCoverage=await aggregateTemporal(db,exactWhere,temporalOptions);
+  const baselineTemporalCoverage=await aggregateTemporal(db,baselineWhere,temporalOptions);
   return {
-    ...exact,comparisonTier:"EXACT_CONTEXT",conditions:query,
-    broaderBaseline:{...baseline,comparisonTier:"SETUP_BASELINE"},
+    ...exact,comparisonTier:"EXACT_CONTEXT",conditions:query,temporalCoverage,
+    broaderBaseline:{...baseline,comparisonTier:"SETUP_BASELINE",temporalCoverage:baselineTemporalCoverage},
     source:"CLOUDFLARE_D1_HISTORICAL_EVENTS",historicalEvidenceIsNotForecast:true,
     note:exact.status==="AVAILABLE"?"Descriptive historical evidence for first-observable 5m checkpoint states. It is not a forecast.":exact.status==="INSUFFICIENT_SAMPLE"?"Comparable events exist, but the resolved sample is below the minimum. Keep guidance rule-based.":"No comparable evidence-eligible historical events are available for the exact defined cohort."
   };
@@ -208,4 +273,4 @@ async function historicalDbHealth(db){
   }
 }
 
-export {SCHEMA_VERSION,DEFAULT_MIN_RESOLVED,MAX_WRITE_BATCH,EVIDENCE_SAMPLE_CONSTRUCTION,EVIDENCE_SUCCESS_DEFINITION,CONTEXT_FILTERS,PROFILE_FILTERS,ROW_FIELDS,INSERT_SQL,normalizeEvent,normalizeEvidenceQuery,whereFor,summary,upsertHistoricalEvents,queryHistoricalEvidence,historicalDbHealth};
+export {SCHEMA_VERSION,DEFAULT_MIN_RESOLVED,DEFAULT_MIN_RESOLVED_PER_PERIOD,DEFAULT_MIN_POPULATED_PERIODS,MAX_WRITE_BATCH,EVIDENCE_SAMPLE_CONSTRUCTION,EVIDENCE_SUCCESS_DEFINITION,CONTEXT_FILTERS,PROFILE_FILTERS,ROW_FIELDS,INSERT_SQL,normalizeEvent,normalizeEvidenceQuery,whereFor,summary,temporalSummary,aggregateTemporal,upsertHistoricalEvents,queryHistoricalEvidence,historicalDbHealth};
