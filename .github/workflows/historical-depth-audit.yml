@@ -13,6 +13,10 @@ on:
     paths:
       - ".github/workflows/historical-depth-audit.yml"
       - "scripts/probe-historical-depth.js"
+      - "historical-temporal-audit.js"
+      - "historical-cohort-audit.js"
+      - "historical-intrabar-reconstruction.js"
+      - "historical-dataset-job.js"
 
 permissions:
   contents: read
