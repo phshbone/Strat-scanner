@@ -9,6 +9,10 @@ const fakeDb={
     return {
       bind(){
         return {
+          async all(){
+            // Temporal coverage uses D1's .all() query API.
+            return {results:[]};
+          },
           async first(){
             const exact=sql.includes("ftfc_alignment=?");
             return exact
