@@ -37,7 +37,7 @@ async function main(){
   const delayMs=Math.max(0,Number(process.env.HISTORICAL_DEPTH_DELAY_MS)||8000);
   const proxyBase=process.env.HISTORICAL_PROXY_BASE||"https://thestrat.phshbone.workers.dev";
   const symbol=String(process.env.HISTORICAL_DEPTH_SYMBOL||"SPY").toUpperCase();
-  const outDir=path.resolve(process.env.HISTORICAL_DEPTH_OUTDIR||"artifacts/historical-depth");
+  const outDir=path.resolve(process.env.HISTORICAL_DEPTH_OUTDIR||("artifacts/historical-depth/"+symbol.toLowerCase()));
 
   const end=new Date();
   end.setUTCDate(end.getUTCDate()-1);
@@ -71,12 +71,12 @@ async function main(){
   const structureTemporal=temporal.auditsForCohorts(structure.events,structureExact,{minResolvedPerPeriod:10,minPopulatedPeriods:3});
 
   fs.mkdirSync(outDir,{recursive:true});
-  fs.writeFileSync(path.join(outDir,"spy-15m-midpoint-evidence.json"),JSON.stringify(midpoint,null,2));
-  fs.writeFileSync(path.join(outDir,"spy-15m-structure-evidence.json"),JSON.stringify(structure,null,2));
-  fs.writeFileSync(path.join(outDir,"spy-15m-midpoint-cohorts.json"),JSON.stringify(midpointAudit,null,2));
-  fs.writeFileSync(path.join(outDir,"spy-15m-structure-cohorts.json"),JSON.stringify(structureAudit,null,2));
-  fs.writeFileSync(path.join(outDir,"spy-15m-midpoint-temporal.json"),JSON.stringify(midpointTemporal,null,2));
-  fs.writeFileSync(path.join(outDir,"spy-15m-structure-temporal.json"),JSON.stringify(structureTemporal,null,2));
+  fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-15m-midpoint-evidence.json"),JSON.stringify(midpoint,null,2));
+  fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-15m-structure-evidence.json"),JSON.stringify(structure,null,2));
+  fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-15m-midpoint-cohorts.json"),JSON.stringify(midpointAudit,null,2));
+  fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-15m-structure-cohorts.json"),JSON.stringify(structureAudit,null,2));
+  fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-15m-midpoint-temporal.json"),JSON.stringify(midpointTemporal,null,2));
+  fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-15m-structure-temporal.json"),JSON.stringify(structureTemporal,null,2));
 
   const summary={
     generatedAt:new Date().toISOString(),
