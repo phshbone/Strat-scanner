@@ -57,6 +57,12 @@ async function main(){
 
   const midpoint=job.buildEvidenceDataset(parentSeries,lowerSeries,{stopModel:"MIDPOINT",horizonBars:20});
   const structure=job.buildEvidenceDataset(parentSeries,lowerSeries,{stopModel:"STRUCTURE",horizonBars:20});
+  if(midpoint.events.length!==structure.events.length) throw new Error("stop models disagree on event occurrence count");
+  const occurrenceKey=e=>[e.symbol||e.ticker,e.signalBarTimestamp,e.activationTimestamp,e.setup,e.setupVariant,e.direction].join("|");
+  const midpointKeys=midpoint.events.map(occurrenceKey).sort();
+  const structureKeys=structure.events.map(occurrenceKey).sort();
+  if(JSON.stringify(midpointKeys)!==JSON.stringify(structureKeys)) throw new Error("stop models disagree on setup variant or event identity");
+  if([...midpoint.events,...structure.events].some(e=>e.setup==="2-1-2"&&!["CONTINUATION","REVERSAL"].includes(e.setupVariant))) throw new Error("2-1-2 event lacks deterministic continuation/reversal classification");
   const midpointAudit=audit.buildCohortAudit(midpoint.events,{minResolved:20});
   const structureAudit=audit.buildCohortAudit(structure.events,{minResolved:20});
   const midpointExact=midpointAudit.levels.exactCheckpoint.filter(row=>row.status==="AVAILABLE");
