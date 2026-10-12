@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       days:
-        description: Calendar days of SPY history to reconstruct
+        description: Calendar days of market history to reconstruct
         required: false
         default: "180"
         type: string
@@ -28,8 +28,13 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        symbol: [SPY, QQQ]
     env:
-      HISTORICAL_DEPTH_SYMBOL: SPY
+      HISTORICAL_DEPTH_SYMBOL: ${{ matrix.symbol }}
       HISTORICAL_DEPTH_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.days || '180' }}
       HISTORICAL_DEPTH_CHUNK_DAYS: "30"
       HISTORICAL_DEPTH_DELAY_MS: "8000"
@@ -42,7 +47,7 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Build deeper SPY historical evidence audit
+      - name: Build deeper ${{ matrix.symbol }} historical evidence audit
         run: |
           set -o pipefail
           node scripts/probe-historical-depth.js | tee historical-depth.log
@@ -50,7 +55,7 @@ jobs:
       - name: Upload historical depth evidence
         uses: actions/upload-artifact@v4
         with:
-          name: historical-spy-depth-${{ github.run_id }}
+          name: historical-${{ matrix.symbol }}-depth-${{ github.run_id }}
           path: |
             artifacts/historical-depth/
             historical-depth.log
