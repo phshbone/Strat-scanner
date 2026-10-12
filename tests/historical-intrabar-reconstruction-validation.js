@@ -37,6 +37,7 @@ const parentSeries={symbol:"SPY",timeframe:"15",marketType:"US_EQUITY",bars:pare
 const lowerSeries={symbol:"SPY",timeframe:"5",marketType:"US_EQUITY",bars:lowers};
 const result=r.buildCheckpointEvents({parentSeries,lowerSeries,stopModel:"STRUCTURE",horizonBars:5});
 t("checkpoint builder returns evidence-eligible reconstructed events",()=>assert.ok(result.events.every(e=>e.evidenceEligible===true&&e.sampleConstruction===r.SAMPLE_CONSTRUCTION)));
+t("every checkpoint event carries explicit valid setup variant",()=>assert.ok(result.events.every(e=>["CONTINUATION","REVERSAL","UNSPECIFIED"].includes(e.setupVariant))));
 t("checkpoint timestamps are lower-bar close observations",()=>assert.ok(result.events.every(e=>String(e.activationTimestamp||"").endsWith("Z"))));
 t("event ids are checkpoint-specific and stop-model-specific",()=>assert.ok(result.events.every(e=>e.id.includes("|STRUCTURE|"))));
 

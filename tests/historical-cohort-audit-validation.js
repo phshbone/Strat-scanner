@@ -36,9 +36,20 @@ t("additional conditions split comparable cohorts",()=>{
 t("audit exposes four controlled comparison levels",()=>{
   const x=audit.buildCohortAudit(rows,{minResolved:3});
   assert.ok(Array.isArray(x.levels.setupBaseline));
+  assert.ok(Array.isArray(x.levels.setupVariant));
   assert.ok(Array.isArray(x.levels.ftfc));
   assert.ok(Array.isArray(x.levels.ftfcPrice));
   assert.ok(Array.isArray(x.levels.exactCheckpoint));
+});
+
+t("2-1-2 continuation and reversal are kept in different cohorts",()=>{
+  const examples=[
+    {...e("c",{setup:"2-1-2"}),setupVariant:"CONTINUATION"},
+    {...e("r",{setup:"2-1-2",resolution:"LOSS"}),setupVariant:"REVERSAL"}
+  ];
+  const groups=audit.buildCohortAudit(examples,{minResolved:1}).levels.setupVariant;
+  assert.equal(groups.length,2);
+  assert.deepEqual(groups.map(g=>g.setupVariant).sort(),["CONTINUATION","REVERSAL"]);
 });
 
 console.log("\n"+pass+"/"+pass+" PASS historical cohort audit validation");

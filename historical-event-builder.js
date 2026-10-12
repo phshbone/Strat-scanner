@@ -192,6 +192,7 @@ function buildHistoricalEvent({
     signalBarTimestamp:timestampForBar(bar,signalIndex),
     setup:setup.name,
     setupId:setup.name,
+    setupVariant:setup.name==="2-1-2"?(setup.variant==="CONTINUATION"?"CONTINUATION":"REVERSAL"):"UNSPECIFIED",
     direction:setup.direction,
     timeframe:String(timeframe||bar.timeframe||bar?.semantics?.timeframe||"").toUpperCase()||null,
     marketType:marketType||bar?.semantics?.marketType||null,
