@@ -70,6 +70,15 @@ function detectSetup(bars, options={}){
     return {name:"2-1-2",direction:"BEARISH",trigger:b.low,magnitude:a.low,reference:b,currentType:rawCt,pathResolved:rawCt!=="3" || !!options.currentBarPathDirection};
   }
 
+  // 2-1-2 continuation: same-direction break after the inside bar.
+  // A completed outside (3) remains path-ambiguous unless separately resolved.
+  if(at==="2U" && bt==="1" && ct==="2U"){
+    return {name:"2-1-2",direction:"BULLISH",variant:"CONTINUATION",trigger:b.high,magnitude:a.high,reference:b,currentType:rawCt,pathResolved:true};
+  }
+  if(at==="2D" && bt==="1" && ct==="2D"){
+    return {name:"2-1-2",direction:"BEARISH",variant:"CONTINUATION",trigger:b.low,magnitude:a.low,reference:b,currentType:rawCt,pathResolved:true};
+  }
+
   // 3-1-2: the initial 3 is already historical context; the active bar is directional 2.
   if(at==="3" && bt==="1" && rawCt==="2U"){
     return {name:"3-1-2",direction:"BULLISH",trigger:b.high,magnitude:a.high,reference:b,currentType:rawCt,pathResolved:true};
