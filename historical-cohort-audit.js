@@ -61,6 +61,7 @@ function buildCohortAudit(events,{minResolved=DEFAULT_MIN_RESOLVED}={}){
     evidenceEligibleEvents:rows.length,
     levels:{
       setupBaseline:groupCohorts(rows,["setup","direction","stopModel"],{minResolved}),
+      setupVariant:groupCohorts(rows,["setup","setupVariant","direction","stopModel"],{minResolved}),
       ftfc:groupCohorts(rows,["setup","direction","stopModel","ftfcAlignment"],{minResolved}),
       ftfcPrice:groupCohorts(rows,["setup","direction","stopModel","ftfcAlignment","priceBucket"],{minResolved}),
       exactCheckpoint:groupCohorts(rows,["setup","direction","stopModel","ftfcAlignment","priceBucket","observationPhase"],{minResolved})
