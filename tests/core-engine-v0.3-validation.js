@@ -56,12 +56,12 @@ bars=[{high:14,low:10},{high:13,low:8},{high:12,low:9},{high:11.5,low:8.5}];
 s=detectSetup(bars);
 t('bearish 2-1-2 continuation',{name:s.name,direction:s.direction,variant:s.variant,trigger:s.trigger,magnitude:s.magnitude},{name:'2-1-2',direction:'BEARISH',variant:'CONTINUATION',trigger:9,magnitude:8});
 
-bars=[{high:10,low:6},{high:12,low:7},{high:11,low:8},{high:11.5,low:7.5}];
+bars=[{high:10,low:6},{high:12,low:7},{high:11,low:8},{high:10.8,low:8.2}];
 s=detectSetup(bars);
 t('inside break remains pending when final bar stays inside',{name:s.name,direction:s.direction},{name:'INSIDE BREAK PENDING',direction:'BOTH'});
 
-bars=[{high:10,low:6},{high:12,low:7},{high:11,low:8},{high:11.5,low:7.5}];
-s=detectSetup([{high:10,low:6},{high:12,low:7},{high:11,low:8},{high:11.5,low:7.5}]);
+bars=[{high:10,low:6},{high:12,low:7},{high:11,low:8},{high:10.8,low:8.2}];
+s=detectSetup(bars);
 t('no premature continuation before inside high breaks',s.name,'INSIDE BREAK PENDING');
 
 bars=[{high:10,low:6},{high:12,low:7},{high:11,low:8},{high:12.5,low:7.5}];
