@@ -33,7 +33,8 @@ function diagnosticSummary(dataset){
     ambiguous:events.filter(e=>e.sequenceAmbiguous===true||e.resolution==="AMBIGUOUS").length,
     byFtfc:countBy(events,e=>e.ftfcAlignment||"NO_DATA"),
     byPriceBucket:countBy(events,e=>e.priceBucket||"UNKNOWN"),
-    byObservationPhase:countBy(events,e=>e.observationPhase||"UNKNOWN")
+    byObservationPhase:countBy(events,e=>e.observationPhase||"UNKNOWN"),
+    bySetupDirectionResolution:countBy(events,e=>[e.setup||"UNKNOWN",e.direction||"UNKNOWN",e.resolution||"UNKNOWN"].join("|"))
   };
 }
 
