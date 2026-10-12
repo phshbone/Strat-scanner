@@ -185,7 +185,7 @@ function buildCheckpointEvents({parentSeries,lowerSeries,stopModel="MIDPOINT",ho
         activationPrice:Number(partial.close),
         observationLagMinutes:lag,
         observationPhase,
-        setup:setup.name,setupId:setup.name,direction:setup.direction,timeframe:"15",marketType:parentSeries.marketType||parentBar?.semantics?.marketType||null,
+        setup:setup.name,setupId:setup.name,setupVariant:setup.name==="2-1-2"?(setup.variant==="CONTINUATION"?"CONTINUATION":"REVERSAL"):"UNSPECIFIED",direction:setup.direction,timeframe:"15",marketType:parentSeries.marketType||parentBar?.semantics?.marketType||null,
         trigger:Number(setup.trigger),entry:Number(setup.trigger),stopModel:builder.normalizeStopModel(stopModel),stop,magnitude:Number(setup.magnitude),
         dataSemantics:parentBar.semantics||null,semanticKey:parentBar.semanticKey||null,currentType:setup.currentType||null,pathResolved:true,
         pathResolutionSource:pathDirection?"LOWER_TIMEFRAME_5M_SETUP_PATH":"LOWER_TIMEFRAME_5M_CHECKPOINT",
