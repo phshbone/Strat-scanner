@@ -84,8 +84,8 @@ async function main(){
     lowerChunks:lowerSeries.range?.chunksRequested||null,
     sampleConstruction:midpoint.sampleConstruction,
     successDefinition:midpoint.successDefinition,
-    midpoint:{...datasetSummary(midpoint),cohorts:auditSummary(midpointAudit),temporalExact:midpointTemporal},
-    structure:{...datasetSummary(structure),cohorts:auditSummary(structureAudit),temporalExact:structureTemporal},
+    midpoint:{...datasetSummary(midpoint),variantBreakdown:midpointAudit.levels.setupVariant.filter(row=>row.setup==="2-1-2"),cohorts:auditSummary(midpointAudit),temporalExact:midpointTemporal},
+    structure:{...datasetSummary(structure),variantBreakdown:structureAudit.levels.setupVariant.filter(row=>row.setup==="2-1-2"),cohorts:auditSummary(structureAudit),temporalExact:structureTemporal},
     note:"Research evidence from first-observable completed 5m checkpoints inside 15m bars. Percentages and temporal slices are descriptive historical diagnostics, not forecasts, confidence scores, or trade recommendations."
   };
   fs.writeFileSync(path.join(outDir,"summary.json"),JSON.stringify(summary,null,2));
