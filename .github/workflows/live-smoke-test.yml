@@ -19,6 +19,8 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'core-engine-v0.3.js'
+      - 'tests/core-engine-v0.3-validation.js'
       - 'live-candidates-ui.js'
       - 'chart-workspace-ui.js'
       - 'chart-live-watch.js'
