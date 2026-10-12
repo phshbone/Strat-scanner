@@ -34,7 +34,8 @@ function diagnosticSummary(dataset){
     byFtfc:countBy(events,e=>e.ftfcAlignment||"NO_DATA"),
     byPriceBucket:countBy(events,e=>e.priceBucket||"UNKNOWN"),
     byObservationPhase:countBy(events,e=>e.observationPhase||"UNKNOWN"),
-    bySetupDirectionResolution:countBy(events,e=>[e.setup||"UNKNOWN",e.direction||"UNKNOWN",e.resolution||"UNKNOWN"].join("|"))
+    bySetupDirectionResolution:countBy(events,e=>[e.setup||"UNKNOWN",e.direction||"UNKNOWN",e.resolution||"UNKNOWN"].join("|")),
+    byVariantDirectionResolution:countBy(events,e=>[e.setup||"UNKNOWN",e.setupVariant||"UNKNOWN",e.direction||"UNKNOWN",e.resolution||"UNKNOWN"].join("|"))
   };
 }
 
