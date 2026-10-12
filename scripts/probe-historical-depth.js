@@ -57,6 +57,12 @@ async function main(){
 
   const midpoint=job.buildEvidenceDataset(parentSeries,lowerSeries,{stopModel:"MIDPOINT",horizonBars:20});
   const structure=job.buildEvidenceDataset(parentSeries,lowerSeries,{stopModel:"STRUCTURE",horizonBars:20});
+  if(midpoint.events.length!==structure.events.length) throw new Error("stop models disagree on event occurrence count");
+  const occurrenceKey=e=>[e.symbol||e.ticker,e.signalBarTimestamp,e.activationTimestamp,e.setup,e.setupVariant,e.direction].join("|");
+  const midpointKeys=midpoint.events.map(occurrenceKey).sort();
+  const structureKeys=structure.events.map(occurrenceKey).sort();
+  if(JSON.stringify(midpointKeys)!==JSON.stringify(structureKeys)) throw new Error("stop models disagree on setup variant or event identity");
+  if([...midpoint.events,...structure.events].some(e=>e.setup==="2-1-2"&&!["CONTINUATION","REVERSAL"].includes(e.setupVariant))) throw new Error("2-1-2 event lacks deterministic continuation/reversal classification");
   const midpointAudit=audit.buildCohortAudit(midpoint.events,{minResolved:20});
   const structureAudit=audit.buildCohortAudit(structure.events,{minResolved:20});
   const midpointExact=midpointAudit.levels.exactCheckpoint.filter(row=>row.status==="AVAILABLE");
@@ -84,8 +90,8 @@ async function main(){
     lowerChunks:lowerSeries.range?.chunksRequested||null,
     sampleConstruction:midpoint.sampleConstruction,
     successDefinition:midpoint.successDefinition,
-    midpoint:{...datasetSummary(midpoint),cohorts:auditSummary(midpointAudit),temporalExact:midpointTemporal},
-    structure:{...datasetSummary(structure),cohorts:auditSummary(structureAudit),temporalExact:structureTemporal},
+    midpoint:{...datasetSummary(midpoint),variantBreakdown:midpointAudit.levels.setupVariant.filter(row=>row.setup==="2-1-2"),cohorts:auditSummary(midpointAudit),temporalExact:midpointTemporal},
+    structure:{...datasetSummary(structure),variantBreakdown:structureAudit.levels.setupVariant.filter(row=>row.setup==="2-1-2"),cohorts:auditSummary(structureAudit),temporalExact:structureTemporal},
     note:"Research evidence from first-observable completed 5m checkpoints inside 15m bars. Percentages and temporal slices are descriptive historical diagnostics, not forecasts, confidence scores, or trade recommendations."
   };
   fs.writeFileSync(path.join(outDir,"summary.json"),JSON.stringify(summary,null,2));
