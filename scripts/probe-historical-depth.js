@@ -5,6 +5,7 @@ const path=require("path");
 const job=require("../historical-dataset-job.js");
 const audit=require("../historical-cohort-audit.js");
 const temporal=require("../historical-temporal-audit.js");
+const higherTimeframes=require("../historical-higher-timeframe.js");
 
 function yyyyMmDd(date){return date.toISOString().slice(0,10);}
 function countAvailable(rows=[]){return rows.filter(row=>row.status==="AVAILABLE").length;}
@@ -55,6 +56,7 @@ async function main(){
     proxyBase,symbol,timeframe:"5",startDate,endDate,chunkDays,delayMs,outputsize:5000
   });
 
+  const higherResearch=higherTimeframes.buildHigherTimeframeResearch(parentSeries);
   const midpoint=job.buildEvidenceDataset(parentSeries,lowerSeries,{stopModel:"MIDPOINT",horizonBars:20});
   const structure=job.buildEvidenceDataset(parentSeries,lowerSeries,{stopModel:"STRUCTURE",horizonBars:20});
   if(midpoint.events.length!==structure.events.length) throw new Error("stop models disagree on event occurrence count");
@@ -71,6 +73,7 @@ async function main(){
   const structureTemporal=temporal.auditsForCohorts(structure.events,structureExact,{minResolvedPerPeriod:10,minPopulatedPeriods:3});
 
   fs.mkdirSync(outDir,{recursive:true});
+  fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-hourly-daily-observations.json"),JSON.stringify(higherResearch,null,2));
   fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-15m-midpoint-evidence.json"),JSON.stringify(midpoint,null,2));
   fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-15m-structure-evidence.json"),JSON.stringify(structure,null,2));
   fs.writeFileSync(path.join(outDir,symbol.toLowerCase()+"-15m-midpoint-cohorts.json"),JSON.stringify(midpointAudit,null,2));
@@ -90,6 +93,15 @@ async function main(){
     lowerChunks:lowerSeries.range?.chunksRequested||null,
     sampleConstruction:midpoint.sampleConstruction,
     successDefinition:midpoint.successDefinition,
+    higherTimeframeResearch:{
+      construction:higherResearch.construction,productionEligible:false,
+      completeSessions:higherResearch.completeSessions,
+      excludedSessions:higherResearch.excludedSessions,
+      derivedBars:higherResearch.derivedBars,
+      hourly:{observations:higherResearch.timeframes["60"].observations,bySetup:higherResearch.timeframes["60"].bySetup,evidenceEligible:0},
+      daily:{observations:higherResearch.timeframes.D.observations,bySetup:higherResearch.timeframes.D.bySetup,evidenceEligible:0},
+      caveats:higherResearch.warnings
+    },
     midpoint:{...datasetSummary(midpoint),variantBreakdown:midpointAudit.levels.setupVariant.filter(row=>row.setup==="2-1-2"),cohorts:auditSummary(midpointAudit),temporalExact:midpointTemporal},
     structure:{...datasetSummary(structure),variantBreakdown:structureAudit.levels.setupVariant.filter(row=>row.setup==="2-1-2"),cohorts:auditSummary(structureAudit),temporalExact:structureTemporal},
     note:"Research evidence from first-observable completed 5m checkpoints inside 15m bars. Percentages and temporal slices are descriptive historical diagnostics, not forecasts, confidence scores, or trade recommendations."
